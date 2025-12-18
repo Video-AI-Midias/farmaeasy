@@ -122,6 +122,4 @@ class RateLimitResponse(BaseModel):
 
     error: bool = Field(default=True)
     message: str = Field(..., description="Rate limit error message")
-    retry_after_seconds: int = Field(
-        ..., description="Seconds to wait before retrying"
-    )
+    retry_after_seconds: int = Field(..., description="Seconds to wait before retrying")

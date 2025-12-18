@@ -1,8 +1,11 @@
-"""Verification API endpoints for password reset and email change.
+"""Verification Router for Password Reset and Email Change.
 
-Provides routes for:
-- Password reset flow (forgot, verify, reset)
-- Email change flow (request, confirm)
+Endpoints:
+- POST /v1/auth/password/forgot - Request password reset code
+- POST /v1/auth/password/verify-code - Verify reset code
+- POST /v1/auth/password/reset - Reset password with code
+- POST /v1/auth/email/request-change - Request email change (authenticated)
+- POST /v1/auth/email/confirm-change - Confirm email change (authenticated)
 """
 
 from collections.abc import Callable
@@ -10,8 +13,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from src.auth.dependencies import CurrentUser
-from src.auth.validators import validate_password
+from src.auth.dependencies import get_current_active_user
+from src.auth.models import User
 from src.auth.verification import (
     EmailNotAvailableError,
     InvalidCodeError,
@@ -25,7 +28,6 @@ from src.auth.verification_schemas import (
     ConfirmEmailChangeResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
-    RateLimitResponse,
     RequestEmailChangeRequest,
     RequestEmailChangeResponse,
     ResetPasswordRequest,
@@ -33,112 +35,72 @@ from src.auth.verification_schemas import (
     VerifyCodeRequest,
     VerifyCodeResponse,
 )
+from src.core.logging import get_logger
 
+
+logger = get_logger(__name__)
+
+# Constants
+MIN_LOCAL_EMAIL_LENGTH = 2
 
 router = APIRouter(prefix="/v1/auth", tags=["verification"])
 
-
-# ==============================================================================
-# Dependency for VerificationService
-# ==============================================================================
-
+# Module-level getter for dependency injection
 _verification_service_getter: Callable[[], VerificationService] | None = None
 
 
 def set_verification_service_getter(getter: Callable[[], VerificationService]) -> None:
-    """Set the verification service getter function.
-
-    Called by main.py during app initialization.
-    """
-    global _verification_service_getter  # noqa: PLW0603 - Required for DI pattern
+    """Set the verification service getter for dependency injection."""
+    global _verification_service_getter  # noqa: PLW0603
     _verification_service_getter = getter
 
 
 def get_verification_service() -> VerificationService:
-    """Get VerificationService instance."""
+    """Get the verification service instance."""
     if _verification_service_getter is None:
-        raise RuntimeError(
-            "VerificationService not configured - call set_verification_service_getter first"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Verification service not available",
         )
     return _verification_service_getter()
 
 
-VerificationServiceDep = Annotated[VerificationService, Depends(get_verification_service)]
-
-
-# ==============================================================================
-# Error Handling
-# ==============================================================================
-
-
-def handle_verification_error(error: VerificationError) -> HTTPException:
-    """Convert VerificationError to HTTPException."""
-    status_map = {
-        "rate_limit_exceeded": status.HTTP_429_TOO_MANY_REQUESTS,
-        "invalid_code": status.HTTP_400_BAD_REQUEST,
-        "max_attempts_exceeded": status.HTTP_400_BAD_REQUEST,
-        "email_not_available": status.HTTP_409_CONFLICT,
-        "verification_error": status.HTTP_400_BAD_REQUEST,
-    }
-
-    if isinstance(error, RateLimitExceededError):
-        return HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "error": True,
-                "message": error.message,
-                "retry_after_seconds": error.retry_after_seconds,
-            },
-        )
-
-    return HTTPException(
-        status_code=status_map.get(error.code, status.HTTP_400_BAD_REQUEST),
-        detail=error.message,
-    )
-
-
-def get_client_info(request: Request) -> tuple[str | None, str | None]:
-    """Extract client IP and user agent from request."""
-    ip_address = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    if ip_address and "," in ip_address:
-        ip_address = ip_address.split(",")[0].strip()
-    user_agent = request.headers.get("User-Agent")
-    return ip_address, user_agent
-
-
-# ==============================================================================
+# =============================================================================
 # Password Reset Endpoints (Public)
-# ==============================================================================
+# =============================================================================
 
 
 @router.post(
     "/password/forgot",
     response_model=ForgotPasswordResponse,
     summary="Request password reset code",
-    responses={
-        429: {"model": RateLimitResponse, "description": "Rate limit exceeded"},
-    },
+    description="Sends a 6-digit verification code to the email if it exists.",
 )
 async def forgot_password(
-    data: ForgotPasswordRequest,
     request: Request,
-    verification_service: VerificationServiceDep,
+    body: ForgotPasswordRequest,
+    verification_service: Annotated[
+        VerificationService, Depends(get_verification_service)
+    ],
 ) -> ForgotPasswordResponse:
     """Request a password reset code.
 
-    Sends a 6-digit code to the provided email if it exists.
-    Always returns success to not reveal if email exists.
+    Always returns success to avoid revealing if email exists.
     """
-    ip_address, user_agent = get_client_info(request)
+    ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
 
     try:
         await verification_service.request_password_reset(
-            email=data.email,
-            ip_address=ip_address,
+            email=body.email,
+            ip=ip,
             user_agent=user_agent,
         )
     except RateLimitExceededError as e:
-        raise handle_verification_error(e) from e
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        ) from e
 
     return ForgotPasswordResponse()
 
@@ -146,146 +108,168 @@ async def forgot_password(
 @router.post(
     "/password/verify-code",
     response_model=VerifyCodeResponse,
-    summary="Verify reset code",
-    responses={
-        400: {"description": "Invalid or expired code"},
-    },
+    summary="Verify password reset code",
+    description="Validates the verification code without using it.",
 )
-async def verify_reset_code(
-    data: VerifyCodeRequest,
-    verification_service: VerificationServiceDep,
+async def verify_password_reset_code(
+    body: VerifyCodeRequest,
+    verification_service: Annotated[
+        VerificationService, Depends(get_verification_service)
+    ],
 ) -> VerifyCodeResponse:
-    """Verify a password reset code without using it.
-
-    Use this to validate the code before showing the new password form.
-    """
+    """Verify a password reset code."""
     try:
-        await verification_service.verify_reset_code(
-            email=data.email,
-            code=data.code,
+        valid = await verification_service.verify_reset_code(
+            email=body.email,
+            code=body.code,
         )
-        return VerifyCodeResponse(valid=True, message="Codigo valido")
-    except (InvalidCodeError, MaxAttemptsExceededError) as e:
-        return VerifyCodeResponse(valid=False, message=e.message)
+        return VerifyCodeResponse(valid=valid, message="Code is valid")
+    except InvalidCodeError:
+        return VerifyCodeResponse(valid=False, message="Invalid or expired code")
+    except MaxAttemptsExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        ) from e
 
 
 @router.post(
     "/password/reset",
     response_model=ResetPasswordResponse,
     summary="Reset password with code",
-    responses={
-        400: {"description": "Invalid code or password"},
-        422: {"description": "Password validation failed"},
-    },
+    description="Resets the password using the verification code.",
 )
 async def reset_password(
-    data: ResetPasswordRequest,
-    verification_service: VerificationServiceDep,
+    body: ResetPasswordRequest,
+    verification_service: Annotated[
+        VerificationService, Depends(get_verification_service)
+    ],
 ) -> ResetPasswordResponse:
-    """Reset password using verification code.
-
-    Validates the code and updates the password.
-    Sends a notification email after success.
-    """
-    # Validate new password
-    password_result = validate_password(data.new_password)
-    if not password_result.valid:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Senha invalida",
-                "errors": password_result.errors,
-            },
-        )
-
+    """Reset password using verification code."""
     try:
         await verification_service.reset_password(
-            email=data.email,
-            code=data.code,
-            new_password=data.new_password,
+            email=body.email,
+            code=body.code,
+            new_password=body.new_password,
         )
         return ResetPasswordResponse(
             success=True,
-            message="Senha alterada com sucesso",
+            message="Password reset successfully",
         )
-    except (InvalidCodeError, MaxAttemptsExceededError) as e:
-        raise handle_verification_error(e) from e
+    except InvalidCodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except MaxAttemptsExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        ) from e
 
 
-# ==============================================================================
+# =============================================================================
 # Email Change Endpoints (Authenticated)
-# ==============================================================================
+# =============================================================================
 
 
 @router.post(
     "/email/request-change",
     response_model=RequestEmailChangeResponse,
     summary="Request email change",
-    responses={
-        400: {"description": "Invalid password"},
-        409: {"description": "Email already in use"},
-        429: {"model": RateLimitResponse, "description": "Rate limit exceeded"},
-    },
+    description="Sends a verification code to the new email address.",
 )
 async def request_email_change(
-    data: RequestEmailChangeRequest,
     request: Request,
-    user: CurrentUser,
-    verification_service: VerificationServiceDep,
+    body: RequestEmailChangeRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    verification_service: Annotated[
+        VerificationService, Depends(get_verification_service)
+    ],
 ) -> RequestEmailChangeResponse:
-    """Request to change email address.
-
-    Requires current password for verification.
-    Sends a code to the NEW email address.
-    """
-    ip_address, user_agent = get_client_info(request)
+    """Request email change (requires current password)."""
+    ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
 
     try:
-        masked_email = await verification_service.request_email_change(
-            user_id=user.id,
-            new_email=data.new_email,
-            password=data.password,
-            ip_address=ip_address,
+        await verification_service.request_email_change(
+            user_id=current_user.id,
+            new_email=body.new_email,
+            password=body.password,
+            ip=ip,
             user_agent=user_agent,
         )
-        return RequestEmailChangeResponse(
-            message="Codigo enviado para o novo email",
-            email_masked=masked_email,
+
+        # Mask email for response
+        local, domain = body.new_email.split("@")
+        masked = (
+            f"{local[0]}***@{domain}"
+            if len(local) > MIN_LOCAL_EMAIL_LENGTH
+            else f"{local[0]}*@{domain}"
         )
-    except (InvalidCodeError, EmailNotAvailableError, RateLimitExceededError) as e:
-        raise handle_verification_error(e) from e
+
+        return RequestEmailChangeResponse(
+            message="Verification code sent to new email",
+            email_masked=masked,
+        )
+    except VerificationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except EmailNotAvailableError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        ) from e
+    except RateLimitExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        ) from e
 
 
 @router.post(
     "/email/confirm-change",
     response_model=ConfirmEmailChangeResponse,
     summary="Confirm email change",
-    responses={
-        400: {"description": "Invalid or expired code"},
-        409: {"description": "Email no longer available"},
-    },
+    description="Confirms the email change using the verification code.",
 )
 async def confirm_email_change(
-    data: ConfirmEmailChangeRequest,
-    user: CurrentUser,
-    verification_service: VerificationServiceDep,
+    body: ConfirmEmailChangeRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    verification_service: Annotated[
+        VerificationService, Depends(get_verification_service)
+    ],
 ) -> ConfirmEmailChangeResponse:
-    """Confirm email change with verification code.
-
-    After confirmation:
-    - Email is updated
-    - Notification sent to both old and new email
-    - User should re-login
-    """
+    """Confirm email change with verification code."""
     try:
         new_email = await verification_service.confirm_email_change(
-            user_id=user.id,
-            code=data.code,
+            user_id=current_user.id,
+            code=body.code,
         )
         return ConfirmEmailChangeResponse(
             success=True,
-            message="Email alterado com sucesso. Faca login novamente.",
+            message="Email changed successfully",
             new_email=new_email,
         )
-    except (InvalidCodeError, MaxAttemptsExceededError, EmailNotAvailableError) as e:
-        raise handle_verification_error(e) from e
+    except InvalidCodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except MaxAttemptsExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        ) from e
+    except EmailNotAvailableError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        ) from e
+    except VerificationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
