@@ -56,7 +56,7 @@ function getRoleLabel(role: string): string {
     admin: "Administrador",
     teacher: "Professor",
     student: "Aluno",
-    user: "Usuario",
+    user: "Aluno", // Unificado com student - ambos são alunos
   };
   return labels[role] ?? role;
 }
@@ -109,13 +109,13 @@ export function UserMenu({ user }: UserMenuProps) {
         {/* Common links for all users */}
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link to="/settings" className="group cursor-pointer">
+            <Link to="/configuracoes" className="group cursor-pointer">
               <UserIcon className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
               Meu Perfil
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to="/student" className="group cursor-pointer">
+            <Link to="/aluno" className="group cursor-pointer">
               <Home className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
               Meus Cursos
             </Link>
@@ -131,19 +131,19 @@ export function UserMenu({ user }: UserMenuProps) {
             </DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link to="/courses" className="group cursor-pointer">
+                <Link to="/cursos" className="group cursor-pointer">
                   <GraduationCap className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                   Cursos
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/modules" className="group cursor-pointer">
+                <Link to="/modulos" className="group cursor-pointer">
                   <Layers className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                   Modulos
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/lessons" className="group cursor-pointer">
+                <Link to="/aulas" className="group cursor-pointer">
                   <PlayCircle className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                   Aulas
                 </Link>
@@ -162,13 +162,13 @@ export function UserMenu({ user }: UserMenuProps) {
             </DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link to="/users" className="group cursor-pointer">
+                <Link to="/usuarios" className="group cursor-pointer">
                   <Users className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                   Usuarios
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/admin/notifications" className="group cursor-pointer">
+                <Link to="/admin/notificacoes" className="group cursor-pointer">
                   <Bell className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                   Enviar Notificacoes
                 </Link>
@@ -181,7 +181,7 @@ export function UserMenu({ user }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link to="/settings" className="group cursor-pointer">
+            <Link to="/configuracoes" className="group cursor-pointer">
               <Settings className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
               Configuracoes
             </Link>

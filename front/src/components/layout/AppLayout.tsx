@@ -88,30 +88,32 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="mt-6 flex flex-col gap-1">
-                  {/* Dashboard - always visible */}
-                  <Link
-                    to="/dashboard"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      isActive("/dashboard")
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
+                  {/* Painel - Teacher/Admin only */}
+                  {canManageContent && (
+                    <Link
+                      to="/painel"
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        isActive("/painel")
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Painel
+                    </Link>
+                  )}
 
                   {/* Meus Cursos - always visible */}
                   <Link
-                    to="/student"
+                    to="/aluno"
                     onClick={handleNavClick}
                     className={cn(
                       "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",
-                      isActive("/student")
+                      isActive("/aluno")
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground",
                     )}
@@ -128,7 +130,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                           className={cn(
                             "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:no-underline",
                             "hover:bg-accent hover:text-accent-foreground",
-                            isActive("/courses") || isActive("/modules") || isActive("/lessons")
+                            isActive("/cursos") || isActive("/modulos") || isActive("/aulas")
                               ? "bg-accent text-accent-foreground"
                               : "text-muted-foreground",
                           )}
@@ -139,12 +141,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                         <AccordionContent className="pb-0 pt-1">
                           <div className="ml-4 flex flex-col gap-1 border-l pl-4">
                             <Link
-                              to="/courses"
+                              to="/cursos"
                               onClick={handleNavClick}
                               className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
-                                isActive("/courses")
+                                isActive("/cursos")
                                   ? "bg-accent/50 text-accent-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -153,12 +155,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                               Cursos
                             </Link>
                             <Link
-                              to="/modules"
+                              to="/modulos"
                               onClick={handleNavClick}
                               className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
-                                isActive("/modules")
+                                isActive("/modulos")
                                   ? "bg-accent/50 text-accent-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -167,12 +169,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                               Modulos
                             </Link>
                             <Link
-                              to="/lessons"
+                              to="/aulas"
                               onClick={handleNavClick}
                               className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
-                                isActive("/lessons")
+                                isActive("/aulas")
                                   ? "bg-accent/50 text-accent-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -194,7 +196,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                           className={cn(
                             "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:no-underline",
                             "hover:bg-accent hover:text-accent-foreground",
-                            isActive("/users") || isActive("/admin")
+                            isActive("/usuarios") || isActive("/admin")
                               ? "bg-accent text-accent-foreground"
                               : "text-muted-foreground",
                           )}
@@ -205,12 +207,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                         <AccordionContent className="pb-0 pt-1">
                           <div className="ml-4 flex flex-col gap-1 border-l pl-4">
                             <Link
-                              to="/users"
+                              to="/usuarios"
                               onClick={handleNavClick}
                               className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
-                                isActive("/users")
+                                isActive("/usuarios")
                                   ? "bg-accent/50 text-accent-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -219,12 +221,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                               Usuarios
                             </Link>
                             <Link
-                              to="/admin/notifications"
+                              to="/admin/notificacoes"
                               onClick={handleNavClick}
                               className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
-                                isActive("/admin/notifications")
+                                isActive("/admin/notificacoes")
                                   ? "bg-accent/50 text-accent-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -238,14 +240,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </Accordion>
                   )}
 
-                  {/* Settings - always visible */}
+                  {/* Configuracoes - always visible */}
                   <Link
-                    to="/settings"
+                    to="/configuracoes"
                     onClick={handleNavClick}
                     className={cn(
                       "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",
-                      isActive("/settings")
+                      isActive("/configuracoes")
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground",
                     )}
@@ -266,8 +268,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               </SheetContent>
             </Sheet>
 
-            {/* Logo */}
-            <Link to="/dashboard" className="flex items-center">
+            {/* Logo - links to home based on role */}
+            <Link to={canManageContent ? "/painel" : "/aluno"} className="flex items-center">
               <img src={logoHorizontal} alt="Farma Easy" className="h-8 w-auto sm:h-10" />
             </Link>
 

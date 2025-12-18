@@ -50,10 +50,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public routes - accessible without authentication */}
+      {/* Rotas públicas - acessíveis sem autenticação */}
       <Route path="/" element={<HomePage />} />
       <Route
-        path="/login"
+        path="/entrar"
         element={
           <PublicRoute>
             <LoginPage />
@@ -61,7 +61,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/register"
+        path="/cadastrar"
         element={
           <PublicRoute>
             <RegisterPage />
@@ -69,7 +69,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/forgot-password"
+        path="/esqueci-senha"
         element={
           <PublicRoute>
             <ForgotPasswordPage />
@@ -77,18 +77,18 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/reset-password"
+        path="/redefinir-senha"
         element={
           <PublicRoute>
             <ResetPasswordPage />
           </PublicRoute>
         }
       />
-      <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      <Route path="/nao-autorizado" element={<UnauthorizedPage />} />
 
-      {/* Protected routes - Admin/Teacher only */}
+      {/* Rotas protegidas - Admin/Professor apenas */}
       <Route
-        path="/dashboard"
+        path="/painel"
         element={
           <ProtectedRoute requiredRole="teacher">
             <DashboardPage />
@@ -96,7 +96,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/courses"
+        path="/cursos"
         element={
           <ProtectedRoute requiredRole="teacher">
             <CoursesPage />
@@ -104,7 +104,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/courses/:id"
+        path="/cursos/:id"
         element={
           <ProtectedRoute requiredRole="teacher">
             <CourseDetailPage />
@@ -112,7 +112,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/modules"
+        path="/modulos"
         element={
           <ProtectedRoute requiredRole="teacher">
             <ModulesPage />
@@ -120,7 +120,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/modules/:id"
+        path="/modulos/:id"
         element={
           <ProtectedRoute requiredRole="teacher">
             <ModuleDetailPage />
@@ -128,7 +128,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/lessons"
+        path="/aulas"
         element={
           <ProtectedRoute requiredRole="teacher">
             <LessonsPage />
@@ -136,7 +136,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/users"
+        path="/usuarios"
         element={
           <ProtectedRoute requiredRole="admin">
             <UsersPage />
@@ -144,7 +144,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin/notifications"
+        path="/admin/notificacoes"
         element={
           <ProtectedRoute requiredRole="admin">
             <AdminNotificationsPage />
@@ -152,9 +152,9 @@ function AppRoutes() {
         }
       />
 
-      {/* User settings - any authenticated user */}
+      {/* Configurações do usuário - qualquer usuário autenticado */}
       <Route
-        path="/settings"
+        path="/configuracoes"
         element={
           <ProtectedRoute>
             <SettingsPage />
@@ -162,9 +162,9 @@ function AppRoutes() {
         }
       />
 
-      {/* Student routes - Learning area (any authenticated user) */}
+      {/* Rotas do aluno - Área de aprendizado (qualquer usuário autenticado) */}
       <Route
-        path="/student"
+        path="/aluno"
         element={
           <ProtectedRoute>
             <StudentHomePage />
@@ -172,7 +172,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/learn/:slug"
+        path="/aprender/:slug"
         element={
           <ProtectedRoute>
             <StudentCourseViewContent />
@@ -180,7 +180,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/learn/:courseSlug/lesson/:lessonSlug"
+        path="/aprender/:cursoSlug/aula/:aulaSlug"
         element={
           <ProtectedRoute>
             <StudentLessonViewContent />
@@ -188,7 +188,7 @@ function AppRoutes() {
         }
       />
 
-      {/* Catch all - redirect to home */}
+      {/* Catch all - redireciona para home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -214,10 +214,10 @@ function HomePage() {
           <img src={logoHorizontal} alt="FarmaEasy" className="h-10 w-auto" />
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
-              <Link to="/login">Entrar</Link>
+              <Link to="/entrar">Entrar</Link>
             </Button>
             <Button asChild>
-              <Link to="/register">Criar conta</Link>
+              <Link to="/cadastrar">Criar conta</Link>
             </Button>
           </div>
         </nav>
@@ -245,13 +245,13 @@ function HomePage() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <Button size="lg" className="gap-2 text-base" asChild>
-                <Link to="/register">
+                <Link to="/cadastrar">
                   <GraduationCap className="h-5 w-5" />
                   Começar agora
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="gap-2 text-base" asChild>
-                <Link to="/login">
+                <Link to="/entrar">
                   <PlayCircle className="h-5 w-5" />
                   Já tenho conta
                 </Link>

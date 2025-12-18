@@ -36,34 +36,36 @@ export function MainNav() {
   const { isAdmin, isTeacher } = useAuth();
 
   const isContentActive =
-    location.pathname.startsWith("/courses") ||
-    location.pathname.startsWith("/modules") ||
-    location.pathname.startsWith("/lessons");
+    location.pathname.startsWith("/cursos") ||
+    location.pathname.startsWith("/modulos") ||
+    location.pathname.startsWith("/aulas");
 
   const isAdminActive =
-    location.pathname.startsWith("/users") || location.pathname.startsWith("/admin");
+    location.pathname.startsWith("/usuarios") || location.pathname.startsWith("/admin");
 
-  const isStudentActive = location.pathname.startsWith("/student");
+  const isStudentActive = location.pathname.startsWith("/aluno");
 
   // Check if user can manage content (teacher or admin)
   const canManageContent = isTeacher || isAdmin;
 
   return (
     <nav className="flex items-center gap-1">
-      {/* Dashboard - always visible */}
-      <Link
-        to="/dashboard"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-          "hover:bg-accent hover:text-accent-foreground",
-          location.pathname === "/dashboard"
-            ? "bg-accent text-accent-foreground"
-            : "text-foreground/80 hover:text-foreground",
-        )}
-      >
-        <LayoutDashboard className="h-4 w-4" />
-        <span className="hidden lg:inline">Dashboard</span>
-      </Link>
+      {/* Painel - Teacher/Admin only */}
+      {canManageContent && (
+        <Link
+          to="/painel"
+          className={cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            "hover:bg-accent hover:text-accent-foreground",
+            location.pathname === "/painel"
+              ? "bg-accent text-accent-foreground"
+              : "text-foreground/80 hover:text-foreground",
+          )}
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          <span className="hidden lg:inline">Painel</span>
+        </Link>
+      )}
 
       {/* Conteudo dropdown - Teacher/Admin only */}
       {canManageContent && (
@@ -87,19 +89,19 @@ export function MainNav() {
             <DropdownMenuLabel>Gerenciar Conteudo</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/courses" className="group cursor-pointer">
+              <Link to="/cursos" className="group cursor-pointer">
                 <GraduationCap className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Cursos
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/modules" className="group cursor-pointer">
+              <Link to="/modulos" className="group cursor-pointer">
                 <Layers className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Modulos
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/lessons" className="group cursor-pointer">
+              <Link to="/aulas" className="group cursor-pointer">
                 <PlayCircle className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Aulas
               </Link>
@@ -110,7 +112,7 @@ export function MainNav() {
 
       {/* Area do Aluno - visible for all authenticated users */}
       <Link
-        to="/student"
+        to="/aluno"
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
           "hover:bg-accent hover:text-accent-foreground",
@@ -145,20 +147,20 @@ export function MainNav() {
             <DropdownMenuLabel>Administracao</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/users" className="group cursor-pointer">
+              <Link to="/usuarios" className="group cursor-pointer">
                 <Users className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Usuarios
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/admin/notifications" className="group cursor-pointer">
+              <Link to="/admin/notificacoes" className="group cursor-pointer">
                 <Bell className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Notificacoes
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/settings" className="group cursor-pointer">
+              <Link to="/configuracoes" className="group cursor-pointer">
                 <Settings className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Configuracoes
               </Link>
