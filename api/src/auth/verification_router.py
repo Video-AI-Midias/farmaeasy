@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from src.auth.dependencies import get_current_active_user
+from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.auth.verification import (
     EmailNotAvailableError,
@@ -182,7 +182,7 @@ async def reset_password(
 async def request_email_change(
     request: Request,
     body: RequestEmailChangeRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     verification_service: Annotated[
         VerificationService, Depends(get_verification_service)
     ],
@@ -237,7 +237,7 @@ async def request_email_change(
 )
 async def confirm_email_change(
     body: ConfirmEmailChangeRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     verification_service: Annotated[
         VerificationService, Depends(get_verification_service)
     ],

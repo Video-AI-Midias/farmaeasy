@@ -12,8 +12,16 @@ import type {
   AdminCreateUserRequest,
   AuthResponse,
   ChangePasswordRequest,
+  ConfirmEmailChangeRequest,
+  ConfirmEmailChangeResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginRequest,
   RegisterRequest,
+  RequestEmailChangeRequest,
+  RequestEmailChangeResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
   TokenResponse,
   UpdateProfileRequest,
   User,
@@ -22,6 +30,8 @@ import type {
   UserListResponse,
   ValidateCPFResponse,
   ValidateEmailResponse,
+  VerifyCodeRequest,
+  VerifyCodeResponse,
 } from "@/types/auth";
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 

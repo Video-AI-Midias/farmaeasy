@@ -178,3 +178,61 @@ export interface UserDetailsResponse {
   progress: UserProgressSummary;
   comments_count: number;
 }
+
+// =============================================================================
+// Password Reset & Email Change Types
+// =============================================================================
+
+// Password Reset - Forgot Password
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+// Password Reset - Verify Code
+export interface VerifyCodeRequest {
+  email: string;
+  code: string;
+}
+
+export interface VerifyCodeResponse {
+  valid: boolean;
+  message: string;
+}
+
+// Password Reset - Reset Password
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  new_password: string;
+}
+
+export interface ResetPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+// Email Change - Request
+export interface RequestEmailChangeRequest {
+  new_email: string;
+  password: string;
+}
+
+export interface RequestEmailChangeResponse {
+  message: string;
+  email_masked: string;
+}
+
+// Email Change - Confirm
+export interface ConfirmEmailChangeRequest {
+  code: string;
+}
+
+export interface ConfirmEmailChangeResponse {
+  success: boolean;
+  message: string;
+  new_email: string | null;
+}
