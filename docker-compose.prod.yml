@@ -62,8 +62,8 @@ services:
       - CASSANDRA_DC=datacenter1
       - CASSANDRA_RACK=rack1
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
-      - HEAP_NEWSIZE=256M
-      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=128M
+      - MAX_HEAP_SIZE=512M
     volumes:
       - cassandra-prod-data:/var/lib/cassandra
     healthcheck:
