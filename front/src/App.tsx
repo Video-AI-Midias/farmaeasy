@@ -1,3 +1,4 @@
+import heroIllustration from "@/assets/hero-illustration.png";
 import logoHorizontal from "@/assets/logo-horizontal.png";
 import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -276,62 +277,15 @@ function HomePage() {
             </div>
           </div>
 
-          {/* Right - Illustration/Visual */}
+          {/* Right - Hero Illustration */}
           <div className="relative hidden lg:block">
             <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-accent/10 to-transparent rounded-3xl blur-3xl" />
-            <div className="relative grid grid-cols-2 gap-4">
-              {/* Feature Cards - Benefícios reais do FarmaEasy */}
-              <Card className="col-span-2 bg-card/80 backdrop-blur border-primary/20">
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <BookOpen className="h-7 w-7 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Roteiros Prontos</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Scripts para balcão, telefone e WhatsApp prontos para usar
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/80 backdrop-blur border-accent/20">
-                <CardContent className="p-5 space-y-3">
-                  <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                    <Award className="h-6 w-6 text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Planos de Ação</h3>
-                    <p className="text-xs text-muted-foreground">Checklists e templates</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/80 backdrop-blur border-secondary/20">
-                <CardContent className="p-5 space-y-3">
-                  <div className="h-12 w-12 rounded-xl bg-secondary/10 flex items-center justify-center">
-                    <Users className="h-6 w-6 text-secondary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Equipe Alinhada</h3>
-                    <p className="text-xs text-muted-foreground">Padronize o atendimento</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-2 bg-card/80 backdrop-blur border-green-500/20">
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-green-500/10 flex items-center justify-center">
-                    <Shield className="h-7 w-7 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Garantia de 7 dias</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Satisfação garantida ou seu dinheiro de volta
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="relative">
+              <img
+                src={heroIllustration}
+                alt="Treinamento comercial para farmácias - atendimento de excelência"
+                className="w-full h-auto rounded-2xl shadow-2xl border border-border/50"
+              />
             </div>
           </div>
         </div>
