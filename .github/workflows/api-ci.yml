@@ -89,7 +89,7 @@ jobs:
           REDIS_URL: redis://localhost:6379
           TESTING: "true"
           SECRET_KEY: test-secret-key-for-ci
-          ENVIRONMENT: test
+          ENVIRONMENT: testing
 
       - name: Upload Coverage
         if: always()
