@@ -5,11 +5,13 @@ import { AdminNotificationsPage } from "@/pages/AdminNotifications";
 import { CourseDetailPage } from "@/pages/CourseDetail";
 import { CoursesPage } from "@/pages/Courses";
 import { DashboardPage } from "@/pages/Dashboard";
+import { ForgotPasswordPage } from "@/pages/ForgotPassword";
 import { LessonsPage } from "@/pages/Lessons";
 import { LoginPage } from "@/pages/Login";
 import { ModuleDetailPage } from "@/pages/ModuleDetail";
 import { ModulesPage } from "@/pages/Modules";
 import { RegisterPage } from "@/pages/Register";
+import { ResetPasswordPage } from "@/pages/ResetPassword";
 import { SettingsPage } from "@/pages/Settings";
 import { UnauthorizedPage } from "@/pages/Unauthorized";
 import { UsersPage } from "@/pages/Users";
@@ -50,6 +52,22 @@ function AppRoutes() {
         element={
           <PublicRoute>
             <RegisterPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPasswordPage />
           </PublicRoute>
         }
       />

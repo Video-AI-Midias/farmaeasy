@@ -8,6 +8,7 @@
  * - Account information display
  */
 
+import { EmailChangeDialog } from "@/components/auth/EmailChangeDialog";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout";
 import {
@@ -43,7 +44,7 @@ import type { UpdateProfileRequest } from "@/types/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Calendar,
-  CheckCircle,
+  Edit3,
   Eye,
   EyeOff,
   KeyRound,
@@ -141,6 +142,9 @@ function SettingsContent() {
 
   // Logout all state
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Email change dialog state
+  const [isEmailChangeDialogOpen, setIsEmailChangeDialogOpen] = useState(false);
 
   // Profile form
   const profileForm = useForm<ProfileFormData>({
@@ -608,7 +612,15 @@ function SettingsContent() {
                     <p className="text-xs text-muted-foreground">Email</p>
                     <p className="font-medium">{user.email}</p>
                   </div>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEmailChangeDialogOpen(true)}
+                    className="gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Alterar
+                  </Button>
                 </div>
 
                 {/* Phone */}
@@ -694,13 +706,20 @@ function SettingsContent() {
                 <Separator />
 
                 <p className="text-xs text-muted-foreground">
-                  Algumas informacoes como email, CPF e RG so podem ser alteradas entrando em
-                  contato com o suporte.
+                  Algumas informacoes como CPF e RG so podem ser alteradas entrando em contato com o
+                  suporte.
                 </p>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Email Change Dialog */}
+        <EmailChangeDialog
+          open={isEmailChangeDialogOpen}
+          onOpenChange={setIsEmailChangeDialogOpen}
+          currentEmail={user.email}
+        />
       </div>
     </AppLayout>
   );

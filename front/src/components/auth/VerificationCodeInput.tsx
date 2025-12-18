@@ -6,17 +6,17 @@
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type React from "react";
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const CODE_LENGTH = 6;
 
 interface VerificationCodeInputProps {
   value: string;
   onChange: (value: string) => void;
-  disabled?: boolean;
-  error?: string;
-  autoFocus?: boolean;
-  className?: string;
+  disabled?: boolean | undefined;
+  error?: string | undefined;
+  autoFocus?: boolean | undefined;
+  className?: string | undefined;
 }
 
 export function VerificationCodeInput({
@@ -60,7 +60,7 @@ export function VerificationCodeInput({
         }
       }
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   // Handle paste
@@ -77,7 +77,7 @@ export function VerificationCodeInput({
         inputRefs.current[focusIndex]?.focus();
       }
     },
-    [onChange]
+    [onChange],
   );
 
   // Handle key down
@@ -106,7 +106,7 @@ export function VerificationCodeInput({
         inputRefs.current[index + 1]?.focus();
       }
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   // Handle focus
@@ -146,7 +146,7 @@ export function VerificationCodeInput({
               "transition-all duration-200",
               focused === index && "ring-2 ring-primary ring-offset-2",
               error && "border-destructive focus:ring-destructive",
-              value[index] && "bg-primary/5 border-primary/50"
+              value[index] && "bg-primary/5 border-primary/50",
             )}
             aria-label={`Digit ${index + 1}`}
           />

@@ -5,6 +5,8 @@
 export { LoginForm } from "./LoginForm";
 export { RegisterWizard } from "./RegisterWizard";
 export { PasswordStrengthIndicator } from "./PasswordStrengthIndicator";
+export { VerificationCodeInput } from "./VerificationCodeInput";
+export { EmailChangeDialog } from "./EmailChangeDialog";
 export {
   ProtectedRoute,
   PublicRoute,

@@ -354,6 +354,60 @@ export const authApi = {
     });
     return response.data;
   },
+
+  // ==========================================================================
+  // Password Reset API
+  // ==========================================================================
+
+  /**
+   * Request password reset code (public)
+   * Always returns success to not reveal if email exists
+   */
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<ForgotPasswordResponse> => {
+    const response = await api.post<ForgotPasswordResponse>("/auth/password/forgot", data);
+    return response.data;
+  },
+
+  /**
+   * Verify password reset code (public)
+   */
+  verifyResetCode: async (data: VerifyCodeRequest): Promise<VerifyCodeResponse> => {
+    const response = await api.post<VerifyCodeResponse>("/auth/password/verify-code", data);
+    return response.data;
+  },
+
+  /**
+   * Reset password with verification code (public)
+   */
+  resetPassword: async (data: ResetPasswordRequest): Promise<ResetPasswordResponse> => {
+    const response = await api.post<ResetPasswordResponse>("/auth/password/reset", data);
+    return response.data;
+  },
+
+  // ==========================================================================
+  // Email Change API
+  // ==========================================================================
+
+  /**
+   * Request email change (authenticated)
+   * Requires current password for verification
+   */
+  requestEmailChange: async (
+    data: RequestEmailChangeRequest,
+  ): Promise<RequestEmailChangeResponse> => {
+    const response = await api.post<RequestEmailChangeResponse>("/auth/email/request-change", data);
+    return response.data;
+  },
+
+  /**
+   * Confirm email change with verification code (authenticated)
+   */
+  confirmEmailChange: async (
+    data: ConfirmEmailChangeRequest,
+  ): Promise<ConfirmEmailChangeResponse> => {
+    const response = await api.post<ConfirmEmailChangeResponse>("/auth/email/confirm-change", data);
+    return response.data;
+  },
 };
 
 export default api;
