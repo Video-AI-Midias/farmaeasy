@@ -464,3 +464,119 @@ Equipe FarmaEasy
             body_text=body_text,
             to_name=user_name,
         )
+
+    async def send_password_reset_code(
+        self,
+        to: str,
+        user_name: str,
+        code: str,
+    ) -> SendEmailResponse:
+        """Send password reset verification code email.
+
+        Args:
+            to: User email address
+            user_name: User's display name
+            code: 6-digit verification code
+
+        Returns:
+            SendEmailResponse with success status
+        """
+        from src.email.templates import render_password_reset_code
+
+        subject = "Código de Recuperação de Senha - FarmaEasy"
+        body_html, body_text = render_password_reset_code(user_name, code)
+
+        return await self.send_simple_email(
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            to_name=user_name,
+        )
+
+    async def send_password_changed_notification(
+        self,
+        to: str,
+        user_name: str,
+    ) -> SendEmailResponse:
+        """Send password changed notification email.
+
+        Args:
+            to: User email address
+            user_name: User's display name
+
+        Returns:
+            SendEmailResponse with success status
+        """
+        from src.email.templates import render_password_changed
+
+        subject = "Sua Senha Foi Alterada - FarmaEasy"
+        body_html, body_text = render_password_changed(user_name)
+
+        return await self.send_simple_email(
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            to_name=user_name,
+        )
+
+    async def send_email_change_code(
+        self,
+        to: str,
+        user_name: str,
+        code: str,
+    ) -> SendEmailResponse:
+        """Send email change verification code email.
+
+        Args:
+            to: New email address (where code is sent)
+            user_name: User's display name
+            code: 6-digit verification code
+
+        Returns:
+            SendEmailResponse with success status
+        """
+        from src.email.templates import render_email_change_code
+
+        subject = "Confirme seu Novo Email - FarmaEasy"
+        body_html, body_text = render_email_change_code(user_name, code)
+
+        return await self.send_simple_email(
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            to_name=user_name,
+        )
+
+    async def send_email_changed_notification(
+        self,
+        to: str,
+        user_name: str,
+        new_email: str,
+        is_new_email: bool = False,
+    ) -> SendEmailResponse:
+        """Send email changed notification.
+
+        Args:
+            to: Email address to send notification to
+            user_name: User's display name
+            new_email: The new email address
+            is_new_email: True if sending to new email, False if sending to old email
+
+        Returns:
+            SendEmailResponse with success status
+        """
+        from src.email.templates import render_email_changed
+
+        subject = "Seu Email Foi Alterado - FarmaEasy"
+        body_html, body_text = render_email_changed(user_name, new_email, is_new_email)
+
+        return await self.send_simple_email(
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            to_name=user_name,
+        )

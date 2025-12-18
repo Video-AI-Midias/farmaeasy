@@ -318,7 +318,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://farmaeasy.com.br
+      url: https://treinamento.farmaeasy.com.br
 
     steps:
       - name: Download Build Artifact
@@ -336,11 +336,14 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          echo "Deploying Frontend to production..."
+          echo "Deploying Frontend to treinamento.farmaeasy.com.br..."
+
+          # Create directory if not exists
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p /var/www/html/treinamento.farmaeasy.com.br"
 
           # Sync built files to server
           rsync -avz --delete \
-            dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/front/dist/
+            dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/var/www/html/treinamento.farmaeasy.com.br/
 
           echo "Frontend deployment completed!"
 

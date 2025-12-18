@@ -158,6 +158,9 @@ ignore = [
 "src/progress/service.py" = ["S608"]  # CQL prepared statements
 # CLI scripts - print statements and magic values are expected
 "scripts/**/*.py" = ["T20", "PLR2004", "PLR0912", "S105", "S106", "BLE001"]
+# Email module - lazy imports for circular dependency prevention, template variable names contain "PASSWORD"
+"src/email/service.py" = ["PLC0415"]  # Intentional lazy imports to avoid circular dependencies
+"src/email/templates.py" = ["S105"]  # Variable names contain "PASSWORD" but are just email template strings
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
