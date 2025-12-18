@@ -98,6 +98,7 @@ services:
       - DEBUG=false
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
+      - LOG_DIR=/app/logs
       # Redis connection (internal network)
       - REDIS_URL=redis://redis-prod:6379/0
       # Cassandra connection (internal network)
@@ -141,6 +142,7 @@ services:
       - DEBUG=false
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
+      - LOG_DIR=/app/logs
       # Redis connection (internal network)
       - REDIS_URL=redis://redis-prod:6379/0
       # Cassandra connection (internal network)

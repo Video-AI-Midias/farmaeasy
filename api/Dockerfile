@@ -69,6 +69,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appgroup /app/src /app/src
 
+# Create logs directory with correct permissions
+RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
+
 # Switch to non-root user
 USER appuser
 
