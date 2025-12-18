@@ -250,12 +250,7 @@ function HomePage() {
                   Começar agora
                 </Link>
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2 text-base hover:bg-primary hover:text-primary-foreground"
-                asChild
-              >
+              <Button size="lg" variant="outline" className="gap-2 text-base" asChild>
                 <Link to="/login">
                   <PlayCircle className="h-5 w-5" />
                   Já tenho conta
