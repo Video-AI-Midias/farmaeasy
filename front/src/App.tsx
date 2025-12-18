@@ -250,7 +250,12 @@ function HomePage() {
                   Começar agora
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" className="gap-2 text-base" asChild>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 text-base hover:bg-primary hover:text-primary-foreground"
+                asChild
+              >
                 <Link to="/login">
                   <PlayCircle className="h-5 w-5" />
                   Já tenho conta
@@ -292,27 +297,35 @@ function HomePage() {
 
         {/* Features Grid - Mobile */}
         <div className="grid grid-cols-2 gap-4 mt-12 lg:hidden">
-          <Card className="bg-card/80 backdrop-blur">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <BookOpen className="h-8 w-8 text-primary" />
+          <Card className="bg-card backdrop-blur border-border/50">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/20">
+                <BookOpen className="h-7 w-7 text-primary" />
+              </div>
               <span className="text-sm font-medium">Roteiros Prontos</span>
             </CardContent>
           </Card>
-          <Card className="bg-card/80 backdrop-blur">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <Award className="h-8 w-8 text-accent" />
+          <Card className="bg-card backdrop-blur border-border/50">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-accent/20">
+                <Award className="h-7 w-7 text-accent" />
+              </div>
               <span className="text-sm font-medium">Planos de Ação</span>
             </CardContent>
           </Card>
-          <Card className="bg-card/80 backdrop-blur">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <Users className="h-8 w-8 text-secondary" />
+          <Card className="bg-card backdrop-blur border-border/50">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/20">
+                <Users className="h-7 w-7 text-primary" />
+              </div>
               <span className="text-sm font-medium">Equipe Alinhada</span>
             </CardContent>
           </Card>
-          <Card className="bg-card/80 backdrop-blur">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <Shield className="h-8 w-8 text-green-600" />
+          <Card className="bg-card backdrop-blur border-border/50">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-green-500/20">
+                <Shield className="h-7 w-7 text-green-500" />
+              </div>
               <span className="text-sm font-medium">Garantia 7 dias</span>
             </CardContent>
           </Card>
