@@ -276,7 +276,7 @@ function ModuleDetailContent() {
             <AlertDescription>O modulo solicitado nao existe ou foi removido.</AlertDescription>
           </Alert>
           <Button asChild className="mt-4">
-            <Link to="/modules">
+            <Link to="/modulos">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar para modulos
             </Link>
@@ -294,7 +294,7 @@ function ModuleDetailContent() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" asChild>
-                <Link to="/modules">
+                <Link to="/modulos">
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
               </Button>

@@ -14,7 +14,7 @@ export function UnauthorizedPage() {
   const { isTeacher } = useAuth();
 
   // Determine correct home based on user role
-  const homeLink = isTeacher ? "/dashboard" : "/student";
+  const homeLink = isTeacher ? "/painel" : "/aluno";
   const homeLabel = isTeacher ? "Ir para o Dashboard" : "Ir para Meus Cursos";
   const HomeIcon = isTeacher ? Home : GraduationCap;
 

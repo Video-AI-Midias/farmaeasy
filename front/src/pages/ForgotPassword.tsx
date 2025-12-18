@@ -38,7 +38,7 @@ function ForgotPasswordContent() {
       setSuccess(true);
       // Redirect to reset password page after short delay
       setTimeout(() => {
-        navigate("/reset-password", { state: { email } });
+        navigate("/redefinir-senha", { state: { email } });
       }, 2000);
     } catch (err) {
       const axiosError = err as AxiosError<ApiErrorResponse>;
@@ -50,7 +50,7 @@ function ForgotPasswordContent() {
         // Always show success to not reveal if email exists
         setSuccess(true);
         setTimeout(() => {
-          navigate("/reset-password", { state: { email } });
+          navigate("/redefinir-senha", { state: { email } });
         }, 2000);
       }
     } finally {
@@ -121,7 +121,7 @@ function ForgotPasswordContent() {
 
               <div className="text-center">
                 <Link
-                  to="/login"
+                  to="/entrar"
                   className="inline-flex items-center text-sm text-primary hover:underline"
                 >
                   <ArrowLeft className="mr-1 h-4 w-4" />

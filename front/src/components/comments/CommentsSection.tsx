@@ -154,7 +154,7 @@ export function CommentsSection({ lessonId, courseSlug, lessonSlug }: CommentsSe
               Faca login para comentar nesta aula
             </p>
             <Button asChild size="sm" variant="outline">
-              <Link to="/login">Entrar</Link>
+              <Link to="/entrar">Entrar</Link>
             </Button>
           </div>
         )}

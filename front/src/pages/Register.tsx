@@ -12,7 +12,7 @@ function RegisterPageContent() {
   const navigate = useNavigate();
 
   const handleSuccess = () => {
-    navigate("/dashboard", { replace: true });
+    navigate("/painel", { replace: true });
   };
 
   return (

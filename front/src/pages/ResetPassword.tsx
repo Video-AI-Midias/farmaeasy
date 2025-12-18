@@ -78,7 +78,7 @@ function ResetPasswordContent() {
       setSuccess(true);
       // Redirect to login after short delay
       setTimeout(() => {
-        navigate("/login", {
+        navigate("/entrar", {
           state: { message: "Senha alterada com sucesso! Faça login com sua nova senha." },
         });
       }, 2000);
@@ -279,7 +279,7 @@ function ResetPasswordContent() {
 
               <div className="text-center">
                 <Link
-                  to="/login"
+                  to="/entrar"
                   className="inline-flex items-center text-sm text-primary hover:underline"
                 >
                   <ArrowLeft className="mr-1 h-4 w-4" />
