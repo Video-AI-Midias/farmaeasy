@@ -146,6 +146,9 @@ ignore = [
 "src/auth/models.py" = ["S105", "S608"]  # CQL table creation strings
 "src/auth/schemas.py" = ["S105"]  # OAuth2 "Bearer" token_type default
 "src/auth/service.py" = ["S106", "S608"]  # OAuth2 "Bearer" token_type parameter + CQL queries
+"src/auth/verification.py" = ["S608"]  # CQL queries with keyspace from settings
+"src/auth/verification_router.py" = ["S608"]  # CQL queries
+"src/auth/verification_schemas.py" = ["S105"]  # Email template variables
 # Courses module - CQL statements and global service getters pattern
 "src/courses/models.py" = ["S608"]  # CQL table creation strings
 "src/courses/service.py" = ["S608", "RET505"]  # CQL prepared statements
