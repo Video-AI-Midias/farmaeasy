@@ -1,0 +1,181 @@
+# ==============================================================================
+# FarmaEasy - Docker Compose (Production with Blue/Green Deployment)
+# ==============================================================================
+# Usage:
+#   ./blue-green-deploy.sh deploy [tag]   - Deploy with zero downtime
+#   ./blue-green-deploy.sh rollback       - Rollback to previous profile
+#   ./blue-green-deploy.sh status         - Check deployment status
+#
+# Profiles:
+#   - prod: All production services (Redis + both blue/green)
+#   - blue: Blue environment API (port 8001)
+#   - green: Green environment API (port 8002)
+# ==============================================================================
+
+name: farmaeasy-prod
+
+services:
+  # ============================================================================
+  # Redis Production
+  # ============================================================================
+  redis-prod:
+    image: redis:7.4-alpine
+    container_name: farmaeasy-redis-prod
+    restart: unless-stopped
+    networks:
+      - farmaeasy-network
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind only to localhost for security
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --loglevel warning
+    volumes:
+      - redis-prod-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - prod
+      - blue
+      - green
+
+  # ============================================================================
+  # Cassandra Production
+  # ============================================================================
+  cassandra-prod:
+    image: cassandra:5.0
+    container_name: farmaeasy-cassandra-prod
+    restart: unless-stopped
+    networks:
+      - farmaeasy-network
+    ports:
+      - "127.0.0.1:9042:9042"  # Bind only to localhost for security
+    environment:
+      - CASSANDRA_CLUSTER_NAME=FarmaEasyProdCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - HEAP_NEWSIZE=256M
+      - MAX_HEAP_SIZE=1G
+    volumes:
+      - cassandra-prod-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 120s
+    profiles:
+      - prod
+      - blue
+      - green
+
+  # ============================================================================
+  # API Production BLUE (port 8001)
+  # ============================================================================
+  farmaeasy-api-prod-blue:
+    image: ${REGISTRY:-ghcr.io}/${ORG:-video-ai-midias}/${IMAGE_NAME:-farmaeasy-api}:${IMAGE_TAG:-latest}
+    container_name: farmaeasy-api-prod-blue
+    restart: unless-stopped
+    networks:
+      - farmaeasy-network
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./api/.env
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENVIRONMENT=production
+      - BLUE_GREEN_PROFILE=blue
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      # Redis connection (internal network)
+      - REDIS_URL=redis://redis-prod:6379/0
+      # Cassandra connection (internal network)
+      - CASSANDRA_HOSTS=["cassandra-prod"]
+      - CASSANDRA_PORT=9042
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/health/ready'', timeout=5)"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+    profiles:
+      - prod
+      - blue
+
+  # ============================================================================
+  # API Production GREEN (port 8002)
+  # ============================================================================
+  farmaeasy-api-prod-green:
+    image: ${REGISTRY:-ghcr.io}/${ORG:-video-ai-midias}/${IMAGE_NAME:-farmaeasy-api}:${IMAGE_TAG:-latest}
+    container_name: farmaeasy-api-prod-green
+    restart: unless-stopped
+    networks:
+      - farmaeasy-network
+    ports:
+      - "8002:8000"
+    env_file:
+      - ./api/.env
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENVIRONMENT=production
+      - BLUE_GREEN_PROFILE=green
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      # Redis connection (internal network)
+      - REDIS_URL=redis://redis-prod:6379/0
+      # Cassandra connection (internal network)
+      - CASSANDRA_HOSTS=["cassandra-prod"]
+      - CASSANDRA_PORT=9042
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/health/ready'', timeout=5)"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+    profiles:
+      - prod
+      - green
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  farmaeasy-network:
+    driver: bridge
+    name: farmaeasy-network-prod
+
+# ==============================================================================
+# Volumes
+# ==============================================================================
+volumes:
+  redis-prod-data:
+    name: farmaeasy-redis-data-prod
+  cassandra-prod-data:
+    name: farmaeasy-cassandra-data-prod

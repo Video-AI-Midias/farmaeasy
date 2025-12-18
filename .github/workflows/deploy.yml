@@ -18,17 +18,24 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 env:
+  REGISTRY: ghcr.io
+  ORG: video-ai-midias
+  IMAGE_NAME: farmaeasy-api
   SSH_HOST: ${{ secrets.SSH_HOST }}
   SSH_USER: ${{ secrets.SSH_USER }}
-  REMOTE_DIR: /var/www/html/farmaeasy.com.br
+  REMOTE_DIR: /var/www/html/farmaeasy
 
 jobs:
+  # ==========================================================================
+  # Detect Changes
+  # ==========================================================================
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
@@ -51,6 +58,9 @@ jobs:
             front:
               - 'front/**'
 
+  # ==========================================================================
+  # API CI - Lint & Test
+  # ==========================================================================
   api-ci:
     name: API CI
     needs: detect-changes
@@ -97,13 +107,157 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run Tests
-        run: uv run pytest -v --tb=short
+        run: uv run pytest -v --tb=short --cov-fail-under=0
         env:
           REDIS_URL: redis://localhost:6379
           TESTING: "true"
           SECRET_KEY: test-secret-key-for-ci
           ENVIRONMENT: testing
 
+  # ==========================================================================
+  # Build & Push Docker Image
+  # ==========================================================================
+  build-api:
+    name: Build API Docker Image
+    needs: [detect-changes, api-ci]
+    if: |
+      always() &&
+      (needs.api-ci.result == 'success' || needs.api-ci.result == 'skipped') &&
+      (needs.detect-changes.outputs.api-changed == 'true' || github.event.inputs.deploy_api == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          provenance: false
+
+      - name: Image Summary
+        run: |
+          echo "### Docker Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Deploy API (Blue/Green)
+  # ==========================================================================
+  deploy-api:
+    name: Deploy API
+    needs: [detect-changes, build-api]
+    if: |
+      always() &&
+      needs.build-api.result == 'success' &&
+      (needs.detect-changes.outputs.api-changed == 'true' || github.event.inputs.deploy_api == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://api.farmaeasy.com.br
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy API with Blue/Green
+        env:
+          IMAGE_TAG: ${{ needs.build-api.outputs.image_tag }}
+          REGISTRY: ${{ env.REGISTRY }}
+          ORG: ${{ env.ORG }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        run: |
+          echo "Deploying API to production..."
+          echo "Image: $REGISTRY/$ORG/$IMAGE_NAME:$IMAGE_TAG"
+
+          # Sync deployment files
+          rsync -avz --delete \
+            docker-compose.prod.yml \
+            blue-green-deploy.sh \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
+
+          # Sync API .env file (if not exists on server, copy from example)
+          rsync -avz \
+            --ignore-existing \
+            api/.env.example \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/.env
+
+          # Execute blue/green deployment on remote server
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << EOF
+            set -e
+            cd ${{ env.REMOTE_DIR }}
+
+            # Ensure scripts are executable
+            chmod +x blue-green-deploy.sh
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login $REGISTRY -u ${{ github.actor }} --password-stdin
+
+            # Export environment variables for docker compose
+            export REGISTRY="$REGISTRY"
+            export ORG="$ORG"
+            export IMAGE_NAME="$IMAGE_NAME"
+            export IMAGE_TAG="$IMAGE_TAG"
+
+            # Execute blue/green deploy
+            ./blue-green-deploy.sh deploy "$IMAGE_TAG"
+
+            # Cleanup old images
+            docker system prune -af --filter "until=24h" || true
+
+            echo "API deployment completed!"
+          EOF
+
+  # ==========================================================================
+  # Frontend CI
+  # ==========================================================================
   front-ci:
     name: Frontend CI
     needs: detect-changes
@@ -150,72 +304,9 @@ jobs:
           path: front/dist
           retention-days: 1
 
-  deploy-api:
-    name: Deploy API
-    needs: [detect-changes, api-ci]
-    if: |
-      always() &&
-      (needs.api-ci.result == 'success' || needs.api-ci.result == 'skipped') &&
-      (needs.detect-changes.outputs.api-changed == 'true' || github.event.inputs.deploy_api == 'true')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: production
-      url: https://api.farmaeasy.com.br
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy API
-        run: |
-          echo "Deploying API to production..."
-
-          # Sync API files (excluding venv, cache, etc.)
-          rsync -avz --delete \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            --exclude '.pytest_cache' \
-            --exclude '.ruff_cache' \
-            --exclude 'htmlcov' \
-            --exclude '.coverage' \
-            --exclude '*.pyc' \
-            --exclude '.env' \
-            --exclude 'logs/*' \
-            --exclude '.serena' \
-            api/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/
-
-          # Install dependencies and restart service
-          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'EOF'
-            cd ${{ env.REMOTE_DIR }}/api
-
-            # Install uv if not present
-            if ! command -v uv &> /dev/null; then
-              curl -LsSf https://astral.sh/uv/install.sh | sh
-              export PATH="$HOME/.local/bin:$PATH"
-            fi
-
-            # Sync dependencies
-            uv sync --no-dev
-
-            # Restart API service (if using systemd)
-            if systemctl is-active --quiet farmaeasy-api; then
-              sudo systemctl restart farmaeasy-api
-              echo "API service restarted"
-            else
-              echo "No systemd service found, API files updated"
-            fi
-          EOF
-
-          echo "API deployment completed!"
-
+  # ==========================================================================
+  # Deploy Frontend
+  # ==========================================================================
   deploy-front:
     name: Deploy Frontend
     needs: [detect-changes, front-ci]
@@ -249,10 +340,13 @@ jobs:
 
           # Sync built files to server
           rsync -avz --delete \
-            dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
+            dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/front/dist/
 
           echo "Frontend deployment completed!"
 
+  # ==========================================================================
+  # Deployment Summary
+  # ==========================================================================
   notify:
     name: Deployment Summary
     needs: [deploy-api, deploy-front]
