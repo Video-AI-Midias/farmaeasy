@@ -15,6 +15,8 @@ from src.acquisitions.router import admin_router as acquisitions_admin_router
 from src.acquisitions.router import router as acquisitions_router
 from src.auth.router import router as auth_router
 from src.auth.service import AuthService
+from src.auth.verification import VerificationService
+from src.auth.verification_router import router as verification_router
 from src.comments.router import router as comments_router
 from src.comments.service import CommentService
 from src.config import get_settings
@@ -60,6 +62,7 @@ class AppState:
     progress_service: ProgressService | None = None
     notification_service: NotificationService | None = None
     email_service: EmailService | None = None
+    verification_service: VerificationService | None = None
 
 
 app_state = AppState()
@@ -111,6 +114,14 @@ def get_notification_service() -> NotificationService:
         msg = "NotificationService not initialized"
         raise RuntimeError(msg)
     return app_state.notification_service
+
+
+def get_verification_service() -> VerificationService:
+    """Get VerificationService instance from app state."""
+    if app_state.verification_service is None:
+        msg = "VerificationService not initialized"
+        raise RuntimeError(msg)
+    return app_state.verification_service
 
 
 @asynccontextmanager
@@ -211,6 +222,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "email_service_initialized",
                 sender=settings.email_sender_address,
             )
+
+            # Initialize Verification Service (requires email and auth services)
+            if app_state.auth_service:
+                app_state.verification_service = VerificationService(
+                    session=app_state.cassandra_session,
+                    keyspace=settings.cassandra_keyspace,
+                    email_service=app_state.email_service,
+                    auth_service=app_state.auth_service,
+                )
+                app.state.verification_service = app_state.verification_service
+                logger.info("verification_service_initialized")
         except Exception as e:
             logger.warning(
                 "email_service_init_skipped",
@@ -366,6 +388,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(verification_router)
     app.include_router(router_courses)
     app.include_router(router_modules)
     app.include_router(router_lessons)
@@ -396,6 +419,9 @@ def create_app() -> FastAPI:
 
 # Configure router dependencies before creating app
 from src.auth.router import set_auth_service_getter  # noqa: E402
+from src.auth.verification_router import (  # noqa: E402
+    set_verification_service_getter,
+)
 from src.courses.dependencies import (  # noqa: E402
     set_course_service_getter,
     set_lesson_service_getter,
@@ -411,6 +437,7 @@ from src.notifications.dependencies import (  # noqa: E402
 
 set_auth_service_getter(get_auth_service)
 set_admin_auth_service_getter(get_auth_service)
+set_verification_service_getter(get_verification_service)
 set_course_service_getter(get_course_service)
 set_module_service_getter(get_module_service)
 set_lesson_service_getter(get_lesson_service)

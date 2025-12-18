@@ -232,6 +232,10 @@ jobs:
           # Execute blue/green deployment on remote server
           ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << EOF
             set -e
+
+            # Ensure PATH includes docker
+            export PATH="/usr/bin:/usr/local/bin:\$PATH"
+
             cd ${{ env.REMOTE_DIR }}
 
             # Ensure scripts are executable

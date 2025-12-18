@@ -170,6 +170,11 @@ class AuthService:
             SET max_concurrent_sessions = ?, updated_at = ?
             WHERE id = ?
         """)
+        self._update_user_email = self.session.prepare(f"""
+            UPDATE {self.keyspace}.users
+            SET email = ?, updated_at = ?
+            WHERE id = ?
+        """)
 
         # Refresh token queries
         self._get_token_by_jti = self.session.prepare(
@@ -453,6 +458,73 @@ class AuthService:
             self._update_user_password,
             [new_hash, datetime.now(UTC), user.id],
         )
+
+    def reset_password(self, user_id: UUID, new_password: str) -> None:
+        """Reset user password (for password recovery).
+
+        Unlike change_password, this doesn't require the current password.
+        Use only after verifying user identity through verification code.
+
+        Args:
+            user_id: User ID
+            new_password: New password
+
+        Raises:
+            UserNotFoundError: If user doesn't exist
+        """
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise UserNotFoundError
+
+        new_hash = hash_password(new_password)
+        self.session.execute(
+            self._update_user_password,
+            [new_hash, datetime.now(UTC), user.id],
+        )
+
+    def update_user_email(self, user_id: UUID, new_email: str) -> User:
+        """Update user email address.
+
+        Use only after verifying the new email through verification code.
+
+        Args:
+            user_id: User ID
+            new_email: New email address
+
+        Returns:
+            Updated User instance
+
+        Raises:
+            UserNotFoundError: If user doesn't exist
+        """
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise UserNotFoundError
+
+        user.email = new_email.lower()
+        user.updated_at = datetime.now(UTC)
+
+        self.session.execute(
+            self._update_user_email,
+            [user.email, user.updated_at, user.id],
+        )
+
+        return user
+
+    def verify_password(self, password: str, password_hash: str) -> bool:
+        """Verify a password against a hash.
+
+        Wrapper around security.verify_password for external use.
+
+        Args:
+            password: Plain text password
+            password_hash: Stored password hash
+
+        Returns:
+            True if password matches
+        """
+        is_valid, _ = verify_password(password, password_hash)
+        return is_valid
 
     def update_user_role(self, user_id: UUID, new_role: UserRole) -> User:
         """Update user role (admin only).
