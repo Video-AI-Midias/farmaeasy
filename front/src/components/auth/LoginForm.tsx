@@ -153,7 +153,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
       {/* Register link */}
       <p className="text-center text-sm text-muted-foreground">
         Não tem uma conta?{" "}
-        <Link to="/register" className="text-primary hover:underline">
+        <Link to="/cadastrar" className="text-primary hover:underline">
           Criar conta
         </Link>
       </p>

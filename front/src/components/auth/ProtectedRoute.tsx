@@ -2,7 +2,7 @@
  * Protected route wrapper component.
  *
  * Usage:
- * <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+ * <Route path="/painel" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
  * <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPanel /></ProtectedRoute>} />
  */
 
@@ -42,8 +42,8 @@ function LoadingSpinner() {
 export function ProtectedRoute({
   children,
   requiredRole,
-  redirectTo = "/login",
-  unauthorizedRedirectTo = "/unauthorized",
+  redirectTo = "/entrar",
+  unauthorizedRedirectTo = "/nao-autorizado",
 }: ProtectedRouteProps) {
   const { user, isAuthenticated, isInitialized, isLoading } = useAuth();
   const location = useLocation();
@@ -75,17 +75,17 @@ export function ProtectedRoute({
  * Get role-based default redirect path
  */
 function getRoleBasedRedirect(role: UserRole | undefined): string {
-  if (!role) return "/student";
+  if (!role) return "/aluno";
 
   const roleLevel = ROLE_HIERARCHY[role];
 
   // Teachers and admins go to admin dashboard
   if (roleLevel >= ROLE_HIERARCHY.teacher) {
-    return "/dashboard";
+    return "/painel";
   }
 
   // Students and regular users go to student home
-  return "/student";
+  return "/aluno";
 }
 
 /**

@@ -79,7 +79,7 @@ export function useAuthInit() {
  * Require authentication - redirects to login if not authenticated.
  * Returns true when auth check is complete and user is authenticated.
  */
-export function useRequireAuth(redirectTo = "/login") {
+export function useRequireAuth(redirectTo = "/entrar") {
   const { isAuthenticated, isInitialized, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,14 +103,14 @@ export function useRequireAuth(redirectTo = "/login") {
 /**
  * Require specific role - redirects if user doesn't have permission.
  */
-export function useRequireRole(role: UserRole, redirectTo = "/unauthorized") {
+export function useRequireRole(role: UserRole, redirectTo = "/nao-autorizado") {
   const { user, isAuthenticated, isInitialized, isLoading, hasRole } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isInitialized && !isLoading) {
       if (!isAuthenticated) {
-        navigate("/login", { replace: true });
+        navigate("/entrar", { replace: true });
       } else if (!hasRole(role)) {
         navigate(redirectTo, { replace: true });
       }
@@ -127,7 +127,7 @@ export function useRequireRole(role: UserRole, redirectTo = "/unauthorized") {
 /**
  * Redirect authenticated users away from public pages (login, register).
  */
-export function useRedirectIfAuthenticated(redirectTo = "/dashboard") {
+export function useRedirectIfAuthenticated(redirectTo = "/painel") {
   const { isAuthenticated, isInitialized, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

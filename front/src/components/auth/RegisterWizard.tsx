@@ -449,7 +449,7 @@ export function RegisterWizard({ onSuccess, className }: RegisterWizardProps) {
         {/* Login link */}
         <p className="text-center text-sm text-muted-foreground">
           Já tem uma conta?{" "}
-          <Link to="/login" className="text-primary hover:underline">
+          <Link to="/entrar" className="text-primary hover:underline">
             Fazer login
           </Link>
         </p>
