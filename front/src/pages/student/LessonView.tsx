@@ -148,7 +148,7 @@ function findLessonInCourse(
 function CourseSidebar({
   course,
   currentLessonId,
-  courseSlug,
+  cursoSlug,
   isOpen,
   onClose,
   getLessonStatus,
@@ -157,7 +157,7 @@ function CourseSidebar({
 }: {
   course: CourseDetail;
   currentLessonId: string;
-  courseSlug: string;
+  cursoSlug: string;
   isOpen: boolean;
   onClose: () => void;
   getLessonStatus: (lessonId: string) => LessonProgressStatus;
@@ -243,7 +243,7 @@ function CourseSidebar({
 
         <div className="p-4 border-b">
           <Link
-            to={`/learn/${courseSlug}`}
+            to={`/aprender/${cursoSlug}`}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -307,7 +307,7 @@ function CourseSidebar({
                               type="button"
                               key={lesson.id}
                               onClick={() => {
-                                navigate(`/learn/${courseSlug}/lesson/${lesson.slug || lesson.id}`);
+                                navigate(`/aprender/${cursoSlug}/aula/${lesson.slug || lesson.id}`);
                                 onClose();
                               }}
                               className={cn(
@@ -683,7 +683,7 @@ function QuizContent({
 }
 
 export function StudentLessonViewContent() {
-  const { courseSlug, lessonSlug } = useParams<{ courseSlug: string; lessonSlug: string }>();
+  const { cursoSlug, aulaSlug } = useParams<{ cursoSlug: string; aulaSlug: string }>();
   const navigate = useNavigate();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -719,8 +719,8 @@ export function StudentLessonViewContent() {
       const lesson = currentCourse?.modules
         .flatMap((m) => m.lessons)
         .find((l) => l.id === lessonId);
-      if (lesson && courseSlug) {
-        navigate(`/learn/${courseSlug}/lesson/${lesson.slug || lesson.id}`);
+      if (lesson && cursoSlug) {
+        navigate(`/aprender/${cursoSlug}/aula/${lesson.slug || lesson.id}`);
       }
     },
   });
@@ -751,12 +751,12 @@ export function StudentLessonViewContent() {
   }, []);
 
   useEffect(() => {
-    if (courseSlug) {
-      fetchCourse(courseSlug).finally(() => setIsInitialLoad(false));
+    if (cursoSlug) {
+      fetchCourse(cursoSlug).finally(() => setIsInitialLoad(false));
     } else {
       setIsInitialLoad(false);
     }
-  }, [courseSlug, fetchCourse]);
+  }, [cursoSlug, fetchCourse]);
 
   // Check access after course is loaded
   useEffect(() => {
@@ -767,9 +767,9 @@ export function StudentLessonViewContent() {
 
   // Find current lesson
   const lessonInfo = useMemo(() => {
-    if (!currentCourse || !lessonSlug) return null;
-    return findLessonInCourse(currentCourse, lessonSlug);
-  }, [currentCourse, lessonSlug]);
+    if (!currentCourse || !aulaSlug) return null;
+    return findLessonInCourse(currentCourse, aulaSlug);
+  }, [currentCourse, aulaSlug]);
 
   // Get resume position for current lesson
   const resumePosition = useMemo(() => {
@@ -780,8 +780,8 @@ export function StudentLessonViewContent() {
   // Comments hook for review submission
   const { createComment } = useComments(
     lessonInfo?.lesson.id ?? "",
-    courseSlug ?? "",
-    lessonSlug ?? "",
+    cursoSlug ?? "",
+    aulaSlug ?? "",
   );
 
   // Helper to show completion overlay directly (without review)
@@ -905,7 +905,7 @@ export function StudentLessonViewContent() {
 
   // Handle next lesson navigation
   const handleNextLesson = useCallback(() => {
-    if (!lessonInfo?.next || !courseSlug) return;
+    if (!lessonInfo?.next || !cursoSlug) return;
 
     // Cancel autoplay
     autoplay.cancel();
@@ -916,8 +916,8 @@ export function StudentLessonViewContent() {
 
     // Navigate
     const nextLesson = lessonInfo.next.lesson;
-    navigate(`/learn/${courseSlug}/lesson/${nextLesson.slug || nextLesson.id}`);
-  }, [lessonInfo, courseSlug, autoplay, completionOverlay, navigate]);
+    navigate(`/aprender/${cursoSlug}/aula/${nextLesson.slug || nextLesson.id}`);
+  }, [lessonInfo, cursoSlug, autoplay, completionOverlay, navigate]);
 
   // Handle close overlay
   const handleCloseOverlay = useCallback(() => {
@@ -953,7 +953,7 @@ export function StudentLessonViewContent() {
     setShowReviewOverlay(false);
     completionOverlay.hide();
 
-    navigate(`/learn/${courseSlug}/lesson/${lesson.slug || lesson.id}`);
+    navigate(`/aprender/${cursoSlug}/aula/${lesson.slug || lesson.id}`);
   };
 
   // Reset state when lesson changes
@@ -964,7 +964,7 @@ export function StudentLessonViewContent() {
     setRecentlyCompletedLessonId(null);
     completionOverlay.hide();
     autoplay.cancel();
-  }, [lessonSlug]);
+  }, [aulaSlug]);
 
   // Show loading during initial fetch, course loading, or access check
   if (isInitialLoad || isLoadingCourse || isCheckingAccess) {
@@ -987,9 +987,9 @@ export function StudentLessonViewContent() {
             <AlertDescription>O curso solicitado nao existe ou foi removido.</AlertDescription>
           </Alert>
           <Button asChild className="mt-4">
-            <Link to="/dashboard">
+            <Link to="/painel">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar ao Dashboard
+              Voltar ao Painel
             </Link>
           </Button>
         </div>
@@ -1020,7 +1020,7 @@ export function StudentLessonViewContent() {
             <AlertDescription>A aula solicitada nao existe ou foi removida.</AlertDescription>
           </Alert>
           <Button asChild className="mt-4">
-            <Link to={`/learn/${courseSlug}`}>
+            <Link to={`/aprender/${cursoSlug}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar ao curso
             </Link>
@@ -1040,7 +1040,7 @@ export function StudentLessonViewContent() {
       <CourseSidebar
         course={currentCourse}
         currentLessonId={lesson.id}
-        courseSlug={courseSlug ?? ""}
+        cursoSlug={cursoSlug ?? ""}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         getLessonStatus={getLessonStatus}
@@ -1194,7 +1194,7 @@ export function StudentLessonViewContent() {
                 </Button>
               ) : (
                 <Button variant="outline" asChild>
-                  <Link to={`/learn/${courseSlug}`}>
+                  <Link to={`/aprender/${cursoSlug}`}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Voltar ao curso</span>
                   </Link>
@@ -1210,7 +1210,7 @@ export function StudentLessonViewContent() {
                 </Button>
               ) : (
                 <Button asChild>
-                  <Link to={`/learn/${courseSlug}`}>
+                  <Link to={`/aprender/${cursoSlug}`}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Concluir curso</span>
                   </Link>
@@ -1224,8 +1224,8 @@ export function StudentLessonViewContent() {
           {/* Comments */}
           <CommentsSection
             lessonId={lesson.id}
-            courseSlug={courseSlug ?? ""}
-            lessonSlug={lessonSlug ?? ""}
+            courseSlug={cursoSlug ?? ""}
+            lessonSlug={aulaSlug ?? ""}
           />
         </div>
       </main>

@@ -114,7 +114,7 @@ export function CourseAccessDenied({
 
             {/* Back Button */}
             <div className="pt-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+              <Button variant="ghost" onClick={() => navigate("/painel")}>
                 Voltar ao Dashboard
               </Button>
             </div>

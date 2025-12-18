@@ -90,10 +90,10 @@ function CourseEnrollmentCard({ enrollment, course }: CourseEnrollmentCardProps)
     if (course) {
       if (enrollment.last_lesson_id) {
         // Navigate to last lesson
-        navigate(`/learn/${course.slug}/lesson/${enrollment.last_lesson_id}`);
+        navigate(`/aprender/${course.slug}/aula/${enrollment.last_lesson_id}`);
       } else {
         // Navigate to course overview
-        navigate(`/learn/${course.slug}`);
+        navigate(`/aprender/${course.slug}`);
       }
     }
   }, [course, enrollment.last_lesson_id, navigate]);
@@ -227,7 +227,7 @@ function AvailableCourseCard({ course, isEnrolled }: AvailableCourseCardProps) {
             <Badge variant="outline">Ja inscrito</Badge>
           ) : (
             <Button size="sm" variant="outline" asChild>
-              <Link to={`/learn/${course.slug}`} className="gap-1">
+              <Link to={`/aprender/${course.slug}`} className="gap-1">
                 Ver curso
                 <ArrowRight className="h-3 w-3" />
               </Link>
@@ -399,10 +399,10 @@ function StudentHomeContent() {
                       onClick={() => {
                         if (continueEnrollment.last_lesson_id) {
                           navigate(
-                            `/learn/${continueCourse.slug}/lesson/${continueEnrollment.last_lesson_id}`,
+                            `/aprender/${continueCourse.slug}/aula/${continueEnrollment.last_lesson_id}`,
                           );
                         } else {
-                          navigate(`/learn/${continueCourse.slug}`);
+                          navigate(`/aprender/${continueCourse.slug}`);
                         }
                       }}
                       className="gap-2"

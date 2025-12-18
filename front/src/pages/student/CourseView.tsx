@@ -95,7 +95,7 @@ function ModuleItem({
   const moduleProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
   const handleLessonClick = (lesson: LessonInModule) => {
-    navigate(`/learn/${courseSlug}/lesson/${lesson.slug || lesson.id}`);
+    navigate(`/aprender/${courseSlug}/aula/${lesson.slug || lesson.id}`);
   };
 
   return (
@@ -305,9 +305,9 @@ export function StudentCourseViewContent() {
             <AlertDescription>O curso solicitado nao existe ou foi removido.</AlertDescription>
           </Alert>
           <Button asChild className="mt-4">
-            <Link to="/dashboard">
+            <Link to="/painel">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar ao Dashboard
+              Voltar ao Painel
             </Link>
           </Button>
         </div>
@@ -349,7 +349,7 @@ export function StudentCourseViewContent() {
         {/* Course Header */}
         <div className="space-y-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard">
+            <Link to="/painel">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
             </Link>
@@ -406,7 +406,7 @@ export function StudentCourseViewContent() {
 
                 return (
                   <Button asChild className="mt-2">
-                    <Link to={`/learn/${slug}/lesson/${targetLesson.slug || targetLesson.id}`}>
+                    <Link to={`/aprender/${slug}/aula/${targetLesson.slug || targetLesson.id}`}>
                       <PlayCircle className="mr-2 h-4 w-4" />
                       {buttonText}
                     </Link>
