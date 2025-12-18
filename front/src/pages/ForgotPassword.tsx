@@ -68,7 +68,7 @@ function ForgotPasswordContent() {
           <div>
             <h1 className="text-2xl font-semibold">Esqueceu sua senha?</h1>
             <CardDescription className="text-base mt-2">
-              Digite seu email para receber um codigo de recuperacao
+              Digite seu email para receber um código de recuperação
             </CardDescription>
           </div>
         </CardHeader>
@@ -78,7 +78,7 @@ function ForgotPasswordContent() {
               <Alert className="border-green-200 bg-green-50">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
-                  Se o email existir, um codigo de verificacao foi enviado. Redirecionando...
+                  Se o email existir, um código de verificação foi enviado. Redirecionando...
                 </AlertDescription>
               </Alert>
             </div>
@@ -115,7 +115,7 @@ function ForgotPasswordContent() {
                     Enviando...
                   </>
                 ) : (
-                  "Enviar Codigo"
+                  "Enviar Código"
                 )}
               </Button>
 

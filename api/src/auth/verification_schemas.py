@@ -1,6 +1,8 @@
 """Verification schemas for password reset and email change."""
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from src.auth.validators import validate_password
 
 
 # ==============================================================================
@@ -62,6 +64,16 @@ class ResetPasswordRequest(BaseModel):
         min_length=8,
         description="New password (validated by password_validator)",
     )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate password meets security requirements."""
+        result = validate_password(v)
+        if not result.valid:
+            msg = result.message or "Senha invalida"
+            raise ValueError(msg)
+        return v
 
 
 class ResetPasswordResponse(BaseModel):

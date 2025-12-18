@@ -57,13 +57,13 @@ function ResetPasswordContent() {
 
     // Validate passwords match
     if (newPassword !== confirmPassword) {
-      setError("As senhas nao coincidem.");
+      setError("As senhas não coincidem.");
       return;
     }
 
     // Validate password length
     if (newPassword.length < 8) {
-      setError("A senha deve ter no minimo 8 caracteres.");
+      setError("A senha deve ter no mínimo 8 caracteres.");
       return;
     }
 
@@ -79,13 +79,13 @@ function ResetPasswordContent() {
       // Redirect to login after short delay
       setTimeout(() => {
         navigate("/login", {
-          state: { message: "Senha alterada com sucesso! Faca login com sua nova senha." },
+          state: { message: "Senha alterada com sucesso! Faça login com sua nova senha." },
         });
       }, 2000);
     } catch (err) {
       const axiosError = err as AxiosError<ApiErrorResponse>;
       if (axiosError.response?.status === 400) {
-        setError("Codigo invalido ou expirado. Tente novamente.");
+        setError("Código inválido ou expirado. Tente novamente.");
       } else if (axiosError.response?.status === 429) {
         setError(
           axiosError.response.data?.detail || "Muitas tentativas. Tente novamente mais tarde.",
@@ -109,7 +109,7 @@ function ResetPasswordContent() {
     } catch (err) {
       const axiosError = err as AxiosError<ApiErrorResponse>;
       if (axiosError.response?.status === 429) {
-        setError("Muitas tentativas. Aguarde antes de solicitar novo codigo.");
+        setError("Muitas tentativas. Aguarde antes de solicitar novo código.");
       }
     } finally {
       setIsResending(false);
@@ -139,10 +139,10 @@ function ResetPasswordContent() {
             <CardDescription className="text-base mt-2">
               {email ? (
                 <>
-                  Digite o codigo enviado para <strong>{maskEmail(email)}</strong>
+                  Digite o código enviado para <strong>{maskEmail(email)}</strong>
                 </>
               ) : (
-                "Digite o codigo recebido por email"
+                "Digite o código recebido por email"
               )}
             </CardDescription>
           </div>
@@ -183,12 +183,12 @@ function ResetPasswordContent() {
 
               {/* Verification Code */}
               <div className="space-y-2">
-                <Label>Codigo de Verificacao</Label>
+                <Label>Código de Verificação</Label>
                 <VerificationCodeInput
                   value={code}
                   onChange={setCode}
                   disabled={isLoading}
-                  error={error && code.length === 6 ? "Codigo invalido" : undefined}
+                  error={error && code.length === 6 ? "Código inválido" : undefined}
                   autoFocus={!!state?.email}
                 />
               </div>
@@ -237,7 +237,7 @@ function ResetPasswordContent() {
                   />
                 </div>
                 {confirmPassword && confirmPassword !== newPassword && (
-                  <p className="text-sm text-destructive">As senhas nao coincidem</p>
+                  <p className="text-sm text-destructive">As senhas não coincidem</p>
                 )}
               </div>
 
@@ -254,7 +254,7 @@ function ResetPasswordContent() {
 
               {/* Resend code */}
               <div className="text-center space-y-2">
-                <p className="text-sm text-muted-foreground">Nao recebeu o codigo?</p>
+                <p className="text-sm text-muted-foreground">Não recebeu o código?</p>
                 <Button
                   type="button"
                   variant="ghost"
@@ -271,7 +271,7 @@ function ResetPasswordContent() {
                   ) : (
                     <>
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Reenviar codigo
+                      Reenviar código
                     </>
                   )}
                 </Button>
