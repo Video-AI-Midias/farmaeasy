@@ -77,7 +77,7 @@ const roleLabels: Record<string, string> = {
   admin: "Administrador",
   teacher: "Professor",
   student: "Aluno",
-  user: "Usuario",
+  user: "Aluno", // Unificado com student - ambos são alunos
 };
 
 // Profile form schema
@@ -230,7 +230,7 @@ function SettingsContent() {
       toast.success("Voce foi desconectado de todos os dispositivos.");
       // Redirect to login after a short delay
       setTimeout(() => {
-        window.location.href = "/login";
+        window.location.href = "/entrar";
       }, 1500);
     } catch (err) {
       console.error("Error logging out all devices:", err);

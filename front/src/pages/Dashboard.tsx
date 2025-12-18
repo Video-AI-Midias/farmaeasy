@@ -43,7 +43,7 @@ function getRoleLabel(role: string): string {
     admin: "Administrador",
     teacher: "Professor",
     student: "Aluno",
-    user: "Usuario",
+    user: "Aluno", // Unificado com student - ambos são alunos
   };
   return labels[role] ?? role;
 }
@@ -95,35 +95,35 @@ function DashboardContent() {
   const quickActions = [
     {
       label: "Criar Curso",
-      href: "/courses",
+      href: "/cursos",
       icon: BookOpen,
       description: "Adicionar novo curso",
       roles: ["teacher", "admin"],
     },
     {
       label: "Novo Modulo",
-      href: "/modules",
+      href: "/modulos",
       icon: Layers,
       description: "Criar modulo de aulas",
       roles: ["teacher", "admin"],
     },
     {
       label: "Ver Cursos",
-      href: "/courses",
+      href: "/cursos",
       icon: GraduationCap,
       description: "Gerenciar cursos existentes",
       roles: ["teacher", "admin"],
     },
     {
       label: "Usuarios",
-      href: "/users",
+      href: "/usuarios",
       icon: Users,
       description: "Gerenciar usuarios",
       roles: ["admin"],
     },
     {
       label: "Notificacoes",
-      href: "/admin/notifications",
+      href: "/admin/notificacoes",
       icon: Mail,
       description: "Enviar notificacoes",
       roles: ["admin"],
@@ -172,7 +172,7 @@ function DashboardContent() {
           </div>
           {isTeacher && (
             <Button asChild>
-              <Link to="/courses">
+              <Link to="/cursos">
                 <Plus className="mr-2 h-4 w-4" />
                 Novo Curso
               </Link>
@@ -293,7 +293,7 @@ function DashboardContent() {
               </div>
 
               <Button variant="outline" className="w-full" asChild>
-                <Link to="/settings">
+                <Link to="/configuracoes">
                   Editar Perfil
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>

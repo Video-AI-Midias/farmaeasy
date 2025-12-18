@@ -155,7 +155,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
     defaultValues: {
       email: "",
       password: "",
-      role: "user",
+      role: "student",
       name: "",
       phone: "",
       cpf: "",
@@ -427,13 +427,12 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="user">Usuario</SelectItem>
                         <SelectItem value="student">Aluno</SelectItem>
                         <SelectItem value="teacher">Professor</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Professor pode criar cursos. Aluno pode acessar cursos.
+                      Professor pode criar e gerenciar cursos. Aluno pode assistir cursos.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

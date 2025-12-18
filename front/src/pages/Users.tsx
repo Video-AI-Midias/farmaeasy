@@ -80,7 +80,7 @@ const roleLabels: Record<UserRole, string> = {
   admin: "Administrador",
   teacher: "Professor",
   student: "Aluno",
-  user: "Usuario",
+  user: "Aluno", // Unificado com student - ambos são alunos
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -318,7 +318,6 @@ function UsersContent() {
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="teacher">Professor</SelectItem>
                   <SelectItem value="student">Aluno</SelectItem>
-                  <SelectItem value="user">Usuario</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -514,12 +513,10 @@ function UsersContent() {
                     <SelectContent>
                       <SelectItem value="teacher">Professor</SelectItem>
                       <SelectItem value="student">Aluno</SelectItem>
-                      <SelectItem value="user">Usuario</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Professor: pode criar e gerenciar cursos. Aluno: pode acessar cursos. Usuario:
-                    acesso basico.
+                    Professor: pode criar e gerenciar cursos. Aluno: pode assistir cursos.
                   </p>
                 </div>
 
