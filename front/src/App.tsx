@@ -1,5 +1,7 @@
+import logoHorizontal from "@/assets/logo-horizontal.png";
 import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuthInit } from "@/hooks/useAuth";
 import { AdminNotificationsPage } from "@/pages/AdminNotifications";
 import { CourseDetailPage } from "@/pages/CourseDetail";
@@ -20,6 +22,16 @@ import {
   StudentHomePage,
   StudentLessonViewContent,
 } from "@/pages/student";
+import {
+  Award,
+  BookOpen,
+  ExternalLink,
+  GraduationCap,
+  PlayCircle,
+  Shield,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
@@ -194,17 +206,179 @@ export function App() {
 
 function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8">
-      <h1 className="text-4xl font-bold text-primary">FarmaEasy</h1>
-      <p className="mt-4 text-muted-foreground">Sistema de Gestão de Farmácia</p>
-      <div className="mt-8 flex gap-4">
-        <Button asChild>
-          <Link to="/login">Entrar</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/register">Criar conta</Link>
-        </Button>
-      </div>
-    </main>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Header */}
+      <header className="container mx-auto px-4 py-6">
+        <nav className="flex items-center justify-between">
+          <img src={logoHorizontal} alt="FarmaEasy" className="h-10 w-auto" />
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild>
+              <Link to="/login">Entrar</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/register">Criar conta</Link>
+            </Button>
+          </div>
+        </nav>
+      </header>
+
+      {/* Hero Section */}
+      <main className="container mx-auto px-4 py-12 lg:py-20">
+        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+          {/* Left Content */}
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+                <Sparkles className="h-4 w-4" />
+                Treinamento Comercial para Farmácias
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                Padronize atendimento. <span className="text-primary">Venda mais.</span>
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-xl">
+                Treinamento prático para sua equipe de farmácia: padronize atendimento no balcão,
+                telefone e WhatsApp com roteiros prontos e planos de ação.
+              </p>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button size="lg" className="gap-2 text-base" asChild>
+                <Link to="/register">
+                  <GraduationCap className="h-5 w-5" />
+                  Começar agora
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" className="gap-2 text-base" asChild>
+                <Link to="/login">
+                  <PlayCircle className="h-5 w-5" />
+                  Já tenho conta
+                </Link>
+              </Button>
+            </div>
+
+            {/* Social Proof - Informações reais do produto */}
+            <div className="flex items-center gap-6 pt-4 border-t border-border/50">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">13</p>
+                <p className="text-sm text-muted-foreground">Aulas práticas</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">5</p>
+                <p className="text-sm text-muted-foreground">Módulos completos</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">100%</p>
+                <p className="text-sm text-muted-foreground">Aplicação prática</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right - Illustration/Visual */}
+          <div className="relative hidden lg:block">
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-accent/10 to-transparent rounded-3xl blur-3xl" />
+            <div className="relative grid grid-cols-2 gap-4">
+              {/* Feature Cards - Benefícios reais do FarmaEasy */}
+              <Card className="col-span-2 bg-card/80 backdrop-blur border-primary/20">
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="h-7 w-7 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Roteiros Prontos</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Scripts para balcão, telefone e WhatsApp prontos para usar
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/80 backdrop-blur border-accent/20">
+                <CardContent className="p-5 space-y-3">
+                  <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center">
+                    <Award className="h-6 w-6 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Planos de Ação</h3>
+                    <p className="text-xs text-muted-foreground">Checklists e templates</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/80 backdrop-blur border-secondary/20">
+                <CardContent className="p-5 space-y-3">
+                  <div className="h-12 w-12 rounded-xl bg-secondary/10 flex items-center justify-center">
+                    <Users className="h-6 w-6 text-secondary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Equipe Alinhada</h3>
+                    <p className="text-xs text-muted-foreground">Padronize o atendimento</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-2 bg-card/80 backdrop-blur border-green-500/20">
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-green-500/10 flex items-center justify-center">
+                    <Shield className="h-7 w-7 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Garantia de 7 dias</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Satisfação garantida ou seu dinheiro de volta
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Features Grid - Mobile */}
+        <div className="grid grid-cols-2 gap-4 mt-12 lg:hidden">
+          <Card className="bg-card/80 backdrop-blur">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+              <BookOpen className="h-8 w-8 text-primary" />
+              <span className="text-sm font-medium">Roteiros Prontos</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/80 backdrop-blur">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+              <Award className="h-8 w-8 text-accent" />
+              <span className="text-sm font-medium">Planos de Ação</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/80 backdrop-blur">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+              <Users className="h-8 w-8 text-secondary" />
+              <span className="text-sm font-medium">Equipe Alinhada</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/80 backdrop-blur">
+            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+              <Shield className="h-8 w-8 text-green-600" />
+              <span className="text-sm font-medium">Garantia 7 dias</span>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-4 py-8 mt-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/50">
+          <p className="text-sm text-muted-foreground">
+            © 2025 FarmaEasy. Todos os direitos reservados.
+          </p>
+          <Button variant="link" className="gap-2 text-muted-foreground hover:text-primary" asChild>
+            <a href="https://farmaeasy.com.br" target="_blank" rel="noopener noreferrer">
+              Conheça o treinamento completo
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
+      </footer>
+    </div>
   );
 }
