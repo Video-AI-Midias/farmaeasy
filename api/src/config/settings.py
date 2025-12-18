@@ -172,7 +172,8 @@ class Settings(BaseSettings):
         default=None, description="Path to Firebase service account JSON file"
     )
     firebase_storage_bucket: str | None = Field(
-        default=None, description="Firebase Storage bucket (e.g., project-id.appspot.com)"
+        default=None,
+        description="Firebase Storage bucket (e.g., project-id.appspot.com)",
     )
     firebase_project_id: str | None = Field(
         default=None, description="Firebase project ID"

@@ -56,7 +56,9 @@ async def get_video_config(
     return VideoConfigResponse(
         configured=bunny_service.is_configured,
         library_id=settings.bunny_library_id if bunny_service.is_configured else None,
-        cdn_hostname=settings.bunny_cdn_hostname if bunny_service.is_configured else None,
+        cdn_hostname=settings.bunny_cdn_hostname
+        if bunny_service.is_configured
+        else None,
     )
 
 
