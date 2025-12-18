@@ -92,6 +92,28 @@ CREATE INDEX IF NOT EXISTS comments_author_idx
 ON {keyspace}.comments (author_id)
 """
 
+# Comments by ID - O(1) lookup table
+# Allows efficient single comment fetch without full scan
+COMMENTS_BY_ID_TABLE_CQL = """
+CREATE TABLE IF NOT EXISTS {keyspace}.comments_by_id (
+    comment_id UUID PRIMARY KEY,
+    lesson_id UUID,
+    parent_id UUID,
+    author_id UUID,
+    author_name TEXT,
+    author_avatar TEXT,
+    content TEXT,
+    is_edited BOOLEAN,
+    edited_at TIMESTAMP,
+    is_deleted BOOLEAN,
+    reply_count INT,
+    rating TINYINT,
+    is_review BOOLEAN,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+)
+"""
+
 # Comments by parent - optimized for fetching replies
 # Allows efficient "load replies" queries
 COMMENTS_BY_PARENT_TABLE_CQL = """
@@ -183,6 +205,7 @@ COMMENTS_TABLES_CQL = [
     COMMENT_TABLE_CQL,
     COMMENT_PARENT_INDEX_CQL,
     COMMENT_AUTHOR_INDEX_CQL,
+    COMMENTS_BY_ID_TABLE_CQL,
     COMMENTS_BY_PARENT_TABLE_CQL,
     REACTION_TABLE_CQL,
     USER_REACTIONS_TABLE_CQL,
@@ -306,6 +329,48 @@ class CommentReply:
             rating=row.rating if hasattr(row, "rating") else None,
             is_review=row.is_review if hasattr(row, "is_review") else False,
             created_at=row.created_at,
+        )
+
+
+@dataclass
+class CommentLookup:
+    """Lightweight comment for O(1) ID lookup."""
+
+    comment_id: UUID
+    lesson_id: UUID
+    parent_id: UUID | None
+    author_id: UUID
+    author_name: str
+    author_avatar: str | None
+    content: str
+    is_edited: bool
+    edited_at: datetime | None
+    is_deleted: bool
+    reply_count: int
+    rating: int | None
+    is_review: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_row(cls, row: Any) -> "CommentLookup":
+        """Create CommentLookup from Cassandra row."""
+        return cls(
+            comment_id=row.comment_id,
+            lesson_id=row.lesson_id,
+            parent_id=row.parent_id,
+            author_id=row.author_id,
+            author_name=row.author_name or "Usuario",
+            author_avatar=row.author_avatar,
+            content=row.content,
+            is_edited=row.is_edited or False,
+            edited_at=row.edited_at,
+            is_deleted=row.is_deleted or False,
+            reply_count=row.reply_count or 0,
+            rating=row.rating if hasattr(row, "rating") else None,
+            is_review=row.is_review if hasattr(row, "is_review") else False,
+            created_at=row.created_at,
+            updated_at=row.updated_at or row.created_at,
         )
 
 

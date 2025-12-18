@@ -7,16 +7,20 @@ Business logic for:
 - Spam detection and rate limiting
 """
 
+import asyncio
 import hashlib
 import html
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from .models import (
     Comment,
+    CommentLookup,
     CommentReply,
     CommentReport,
     ReactionType,
@@ -26,9 +30,11 @@ from .models import (
     create_report,
 )
 from .schemas import (
+    AuthorResponse,
     CommentListResponse,
     CommentResponse,
     RatingStatsResponse,
+    ReactionCountsResponse,
     decode_cursor,
     encode_cursor,
 )
@@ -37,6 +43,10 @@ from .schemas import (
 if TYPE_CHECKING:
     from cassandra.cluster import Session
     from redis.asyncio import Redis
+
+
+# Thread pool for blocking Cassandra operations
+_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="cassandra_")
 
 
 # ==============================================================================
