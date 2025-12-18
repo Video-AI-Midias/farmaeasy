@@ -1,0 +1,426 @@
+/**
+ * Lesson form component for creating and editing lessons.
+ *
+ * Uses React Hook Form with Zod validation.
+ * Features thumbnail preview for video content.
+ */
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { VideoThumbnail } from "@/components/video/VideoThumbnail";
+import {
+  ContentStatus,
+  ContentType,
+  type CreateLessonRequest,
+  type Lesson,
+  type UpdateLessonRequest,
+} from "@/types/courses";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+// Regex for Bunny.net video ID (UUID format: 8-4-4-4-12 hex chars)
+const VIDEO_ID_REGEX = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+// Supported video URL patterns
+const BUNNY_URL_PATTERNS = [
+  /iframe\.mediadelivery\.net\/embed\/\d+\/[a-f0-9-]+/i, // Embed URL
+  /iframe\.mediadelivery\.net\/play\/\d+\/[a-f0-9-]+/i, // Play URL
+  /\.b-cdn\.net\//i, // CDN URL
+  /\.m3u8/i, // HLS stream
+];
+
+/**
+ * Validates video content URL.
+ * Accepts:
+ * - Bunny.net video ID (UUID format)
+ * - Bunny.net embed/play URLs
+ * - CDN URLs
+ * - HLS streams (.m3u8)
+ * - Standard URLs (http/https)
+ */
+function isValidVideoContent(value: string): boolean {
+  if (!value) return true; // Empty is OK (optional field)
+
+  // Check if it's a video ID (UUID format)
+  if (VIDEO_ID_REGEX.test(value)) {
+    return true;
+  }
+
+  // Check if it's a known Bunny.net URL pattern
+  if (BUNNY_URL_PATTERNS.some((pattern) => pattern.test(value))) {
+    return true;
+  }
+
+  // Check if it's a valid URL
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const lessonSchema = z
+  .object({
+    title: z
+      .string()
+      .min(3, "Titulo deve ter pelo menos 3 caracteres")
+      .max(200, "Titulo deve ter no maximo 200 caracteres"),
+    description: z
+      .string()
+      .max(5000, "Descricao deve ter no maximo 5000 caracteres")
+      .optional()
+      .nullable(),
+    content_type: z.nativeEnum(ContentType),
+    content_url: z
+      .string()
+      .max(1000, "URL deve ter no maximo 1000 caracteres")
+      .refine(isValidVideoContent, {
+        message:
+          "Informe uma URL valida ou um ID de video Bunny.net (ex: 5f41bf1c-bc67-4155-b700-2aeb489dbeea)",
+      })
+      .optional()
+      .nullable()
+      .or(z.literal("")),
+    duration_seconds: z
+      .number()
+      .int("Duracao deve ser um numero inteiro")
+      .min(0, "Duracao nao pode ser negativa")
+      .optional()
+      .nullable(),
+    status: z.nativeEnum(ContentStatus).optional(),
+  })
+  .superRefine((data, ctx) => {
+    // VIDEO requires content_url
+    if (data.content_type === ContentType.VIDEO && !data.content_url) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "URL do video e obrigatoria para aulas do tipo Video",
+        path: ["content_url"],
+      });
+    }
+    // PDF requires content_url
+    if (data.content_type === ContentType.PDF && !data.content_url) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "URL do PDF e obrigatoria para aulas do tipo PDF",
+        path: ["content_url"],
+      });
+    }
+    // TEXT requires description
+    if (data.content_type === ContentType.TEXT && !data.description) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Descricao/conteudo e obrigatorio para aulas do tipo Texto",
+        path: ["description"],
+      });
+    }
+  });
+
+type LessonFormData = z.infer<typeof lessonSchema>;
+
+interface LessonFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  lesson?: Lesson | null;
+  onSubmit: (data: CreateLessonRequest | UpdateLessonRequest) => Promise<void>;
+  isSubmitting?: boolean;
+}
+
+export function LessonForm({
+  open,
+  onOpenChange,
+  lesson,
+  onSubmit,
+  isSubmitting = false,
+}: LessonFormProps) {
+  const isEditing = !!lesson;
+
+  const form = useForm<LessonFormData>({
+    resolver: zodResolver(lessonSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      content_type: ContentType.VIDEO,
+      content_url: "",
+      duration_seconds: null,
+      status: ContentStatus.DRAFT,
+    },
+  });
+
+  // Watch content_type for dynamic label updates
+  const contentType = form.watch("content_type");
+
+  // Determine which fields are required based on content_type
+  const isUrlRequired = contentType === ContentType.VIDEO || contentType === ContentType.PDF;
+  const isDescriptionRequired = contentType === ContentType.TEXT;
+
+  useEffect(() => {
+    if (lesson) {
+      form.reset({
+        title: lesson.title,
+        description: lesson.description || "",
+        content_type: lesson.content_type,
+        content_url: lesson.content_url || "",
+        duration_seconds: lesson.duration_seconds,
+        status: lesson.status,
+      });
+    } else {
+      form.reset({
+        title: "",
+        description: "",
+        content_type: ContentType.VIDEO,
+        content_url: "",
+        duration_seconds: null,
+        status: ContentStatus.DRAFT,
+      });
+    }
+  }, [lesson, form]);
+
+  const handleSubmit = async (data: LessonFormData) => {
+    const submitData = {
+      title: data.title,
+      description: data.description || null,
+      content_type: data.content_type,
+      content_url: data.content_url || null,
+      duration_seconds: data.duration_seconds ?? null,
+      ...(isEditing && { status: data.status }),
+    };
+
+    await onSubmit(submitData);
+    form.reset();
+    onOpenChange(false);
+  };
+
+  const contentTypeOptions = [
+    { value: ContentType.VIDEO, label: "Video" },
+    { value: ContentType.TEXT, label: "Texto" },
+    { value: ContentType.QUIZ, label: "Quiz" },
+    { value: ContentType.PDF, label: "PDF" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? "Editar Aula" : "Criar Aula"}</DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? "Atualize as informacoes da aula"
+              : "Preencha as informacoes para criar uma nova aula"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Titulo *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Introducao aos Antibioticos" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="content_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Conteudo *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {contentTypeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Descricao {isDescriptionRequired && <span className="text-destructive">*</span>}
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder={
+                        isDescriptionRequired
+                          ? "Conteudo da aula em texto (obrigatorio)..."
+                          : "Descreva o conteudo da aula..."
+                      }
+                      className="min-h-[80px]"
+                      {...field}
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  {isDescriptionRequired && (
+                    <FormDescription>
+                      Para aulas do tipo Texto, a descricao e o conteudo principal
+                    </FormDescription>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="content_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    URL do Conteudo {isUrlRequired && <span className="text-destructive">*</span>}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder={
+                        contentType === ContentType.VIDEO
+                          ? "ID do video ou URL (obrigatorio)"
+                          : contentType === ContentType.PDF
+                            ? "URL do PDF (obrigatorio)"
+                            : "URL do conteudo (opcional)"
+                      }
+                      {...field}
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {contentType === ContentType.VIDEO
+                      ? "ID do video Bunny.net, URL de embed/play, ou URL direta do video"
+                      : contentType === ContentType.PDF
+                        ? "URL do arquivo PDF"
+                        : "URL do conteudo (opcional)"}
+                  </FormDescription>
+                  <FormMessage />
+
+                  {/* Video thumbnail preview */}
+                  {contentType === ContentType.VIDEO && field.value && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-muted-foreground">Preview da thumbnail:</p>
+                      <VideoThumbnail
+                        contentUrl={field.value}
+                        size="lg"
+                        showPlayIcon={false}
+                        containerClassName="max-w-[200px]"
+                      />
+                    </div>
+                  )}
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="duration_seconds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duracao (segundos)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="Ex: 300 (5 minutos)"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        field.onChange(value === "" ? null : Number.parseInt(value, 10));
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>Duracao em segundos (para videos e audios)</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={ContentStatus.DRAFT}>Rascunho</SelectItem>
+                        <SelectItem value={ContentStatus.PUBLISHED}>Publicado</SelectItem>
+                        <SelectItem value={ContentStatus.ARCHIVED}>Arquivado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? "Salvar" : "Criar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default LessonForm;

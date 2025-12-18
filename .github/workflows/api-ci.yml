@@ -1,0 +1,100 @@
+name: API CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "api/**"
+      - ".github/workflows/api-ci.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "api/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: api
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Ruff Lint
+        run: uv run ruff check . --output-format=github
+
+      - name: Run Ruff Format Check
+        run: uv run ruff format --check .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Tests
+        run: uv run pytest -v --tb=short
+        env:
+          REDIS_URL: redis://localhost:6379
+          TESTING: "true"
+          SECRET_KEY: test-secret-key-for-ci
+          ENVIRONMENT: test
+
+      - name: Upload Coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: api/coverage.xml
+          retention-days: 7

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.css", "*.json"],
+    "ignore": ["node_modules", "dist", "coverage", "*.config.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "warn"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "useButtonType": "error",
+        "useAltText": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useConst": "error",
+        "useTemplate": "error"
+      },
+      "complexity": {
+        "noForEach": "off"
+      }
+    }
+  },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": false
+    },
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false,
+      "quoteProperties": "asNeeded"
+    }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 100,
+      "quoteStyle": "double"
+    },
+    "linter": {
+      "enabled": true
+    }
+  },
+  "json": {
+    "parser": {
+      "allowComments": true,
+      "allowTrailingCommas": true
+    },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 100,
+      "trailingCommas": "none"
+    }
+  },
+  "overrides": [
+    {
+      "include": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# Typos configuration
+# https://github.com/crate-ci/typos
+
+[default]
+extend-ignore-re = [
+    # Ignore hex strings
+    "[0-9a-fA-F]{32,}",
+    # Ignore base64
+    "[A-Za-z0-9+/=]{40,}",
+]
+
+[files]
+extend-exclude = [
+    "*.lock",
+    "*.svg",
+    ".git/",
+    "node_modules/",
+    ".venv/",
+    "dist/",
+    "coverage/",
+    "htmlcov/",
+]
+
+[default.extend-words]
+# Add custom words here

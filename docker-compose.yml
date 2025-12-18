@@ -1,0 +1,143 @@
+# ==============================================================================
+# FarmaEasy - Docker Compose (Development)
+# ==============================================================================
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f api    # Follow API logs
+#   docker compose down -v        # Stop and remove volumes
+# ==============================================================================
+
+name: farmaeasy-dev
+
+services:
+  # ============================================================================
+  # API Service
+  # ============================================================================
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: development
+    container_name: farmaeasy-api-dev
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    env_file:
+      - ./api/.env
+    environment:
+      # Docker-specific overrides (internal network names)
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - CASSANDRA_HOSTS=["cassandra"]
+      - CASSANDRA_PORT=9042
+    volumes:
+      - ./api/src:/app/src:ro
+      - ./api/tests:/app/tests:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - farmaeasy-network
+
+  # ============================================================================
+  # Redis Service
+  # ============================================================================
+  redis:
+    image: redis:7.4-alpine
+    container_name: farmaeasy-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --loglevel warning
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - farmaeasy-network
+
+  # ============================================================================
+  # Cassandra Service
+  # ============================================================================
+  cassandra:
+    image: cassandra:5.0
+    container_name: farmaeasy-cassandra-dev
+    restart: unless-stopped
+    ports:
+      - "9044:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=FarmaEasyCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - HEAP_NEWSIZE=128M
+      - MAX_HEAP_SIZE=512M
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 120s
+    networks:
+      - farmaeasy-network
+
+  # ============================================================================
+  # Nginx Service
+  # ============================================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: farmaeasy-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - farmaeasy-network
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  farmaeasy-network:
+    driver: bridge
+    name: farmaeasy-network-dev
+
+# ==============================================================================
+# Volumes
+# ==============================================================================
+volumes:
+  redis-data:
+    name: farmaeasy-redis-data-dev
+  cassandra-data:
+    name: farmaeasy-cassandra-data-dev

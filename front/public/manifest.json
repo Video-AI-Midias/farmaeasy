@@ -1,0 +1,26 @@
+{
+  "name": "Farma Easy - Plataforma de Treinamento",
+  "short_name": "Farma Easy",
+  "description": "Plataforma de treinamento comercial para farmácias",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#1E5A98",
+  "background_color": "#F6F8FB",
+  "categories": ["education", "business"],
+  "lang": "pt-BR"
+}

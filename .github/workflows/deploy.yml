@@ -1,0 +1,272 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: "Deploy API"
+        required: false
+        default: true
+        type: boolean
+      deploy_front:
+        description: "Deploy Frontend"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  SSH_HOST: ${{ secrets.SSH_HOST }}
+  SSH_USER: ${{ secrets.SSH_USER }}
+  REMOTE_DIR: /var/www/html/farmaeasy.com.br
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      api-changed: ${{ steps.changes.outputs.api }}
+      front-changed: ${{ steps.changes.outputs.front }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect file changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api:
+              - 'api/**'
+            front:
+              - 'front/**'
+
+  api-ci:
+    name: API CI
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.api-changed == 'true' ||
+      github.event.inputs.deploy_api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Ruff Lint
+        run: uv run ruff check . --output-format=github
+
+      - name: Run Ruff Format Check
+        run: uv run ruff format --check .
+
+      - name: Run Tests
+        run: uv run pytest -v --tb=short
+        env:
+          REDIS_URL: redis://localhost:6379
+          TESTING: "true"
+          SECRET_KEY: test-secret-key-for-ci
+          ENVIRONMENT: test
+
+  front-ci:
+    name: Frontend CI
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.front-changed == 'true' ||
+      github.event.inputs.deploy_front == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: front
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Biome Lint
+        run: npm run lint
+
+      - name: Run TypeScript Check
+        run: npm run typecheck
+
+      - name: Run Tests
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: front-dist
+          path: front/dist
+          retention-days: 1
+
+  deploy-api:
+    name: Deploy API
+    needs: [detect-changes, api-ci]
+    if: |
+      always() &&
+      (needs.api-ci.result == 'success' || needs.api-ci.result == 'skipped') &&
+      (needs.detect-changes.outputs.api-changed == 'true' || github.event.inputs.deploy_api == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://api.farmaeasy.com.br
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy API
+        run: |
+          echo "Deploying API to production..."
+
+          # Sync API files (excluding venv, cache, etc.)
+          rsync -avz --delete \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '.pytest_cache' \
+            --exclude '.ruff_cache' \
+            --exclude 'htmlcov' \
+            --exclude '.coverage' \
+            --exclude '*.pyc' \
+            --exclude '.env' \
+            --exclude 'logs/*' \
+            --exclude '.serena' \
+            api/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/
+
+          # Install dependencies and restart service
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'EOF'
+            cd ${{ env.REMOTE_DIR }}/api
+
+            # Install uv if not present
+            if ! command -v uv &> /dev/null; then
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
+
+            # Sync dependencies
+            uv sync --no-dev
+
+            # Restart API service (if using systemd)
+            if systemctl is-active --quiet farmaeasy-api; then
+              sudo systemctl restart farmaeasy-api
+              echo "API service restarted"
+            else
+              echo "No systemd service found, API files updated"
+            fi
+          EOF
+
+          echo "API deployment completed!"
+
+  deploy-front:
+    name: Deploy Frontend
+    needs: [detect-changes, front-ci]
+    if: |
+      always() &&
+      (needs.front-ci.result == 'success') &&
+      (needs.detect-changes.outputs.front-changed == 'true' || github.event.inputs.deploy_front == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://farmaeasy.com.br
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: front-dist
+          path: dist
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Frontend
+        run: |
+          echo "Deploying Frontend to production..."
+
+          # Sync built files to server
+          rsync -avz --delete \
+            dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
+
+          echo "Frontend deployment completed!"
+
+  notify:
+    name: Deployment Summary
+    needs: [deploy-api, deploy-front]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.deploy-front.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
