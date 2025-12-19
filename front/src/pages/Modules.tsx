@@ -246,7 +246,7 @@ function ModulesContent() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" asChild>
-                            <Link to={`/modules/${module.id}`}>
+                            <Link to={`/modulos/${module.id}`}>
                               <Eye className="h-4 w-4" />
                               <span className="sr-only">Ver</span>
                             </Link>

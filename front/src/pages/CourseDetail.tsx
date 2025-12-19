@@ -250,7 +250,7 @@ function CourseDetailContent() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link to={`/learn/${currentCourse.slug}`} target="_blank">
+              <Link to={`/aprender/${currentCourse.slug}`} target="_blank">
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Ver Curso
               </Link>

@@ -245,7 +245,7 @@ function CoursesContent() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" asChild>
-                            <Link to={`/courses/${course.id}`}>
+                            <Link to={`/cursos/${course.id}`}>
                               <Eye className="h-4 w-4" />
                               <span className="sr-only">Ver</span>
                             </Link>
