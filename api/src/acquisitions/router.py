@@ -12,17 +12,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.auth.dependencies import CurrentUser, require_admin, require_student
+from src.auth.dependencies import (
+    CurrentUser,
+    require_admin,
+    require_student,
+)
 from src.auth.models import User
 from src.courses.dependencies import CourseServiceDep
 
-from .dependencies import AcquisitionServiceDep
+from .dependencies import AcquisitionServiceDep, AuthServiceDep
 from .schemas import (
     AcquisitionListResponse,
     AcquisitionResponse,
     BatchGrantAccessRequest,
     BatchGrantAccessResponse,
     CheckAccessResponse,
+    CourseStudentResponse,
+    CourseStudentsListResponse,
     GrantAccessRequest,
     RevokeAccessRequest,
 )
@@ -215,26 +221,60 @@ async def revoke_access(
 
 @admin_router.get(
     "/course/{course_id}/students",
-    response_model=AcquisitionListResponse,
+    response_model=CourseStudentsListResponse,
     summary="List students with course access",
 )
 async def list_course_students(
     course_id: UUID,
     service: AcquisitionServiceDep,
+    auth_service: AuthServiceDep,
     _: Annotated[User, Depends(require_admin)],
     limit: int = 100,
-) -> AcquisitionListResponse:
-    """List all users with access to a specific course (admin only)."""
+) -> CourseStudentsListResponse:
+    """List all users with access to a specific course (admin only).
+
+    Returns full user information (name, email, avatar) along with
+    acquisition details (type, status, dates).
+    """
     acquisitions = await service.get_course_students(
         course_id=course_id,
         limit=limit,
     )
 
-    items = [AcquisitionResponse.from_acquisition(a) for a in acquisitions]
+    # Fetch user data for each acquisition
+    items: list[CourseStudentResponse] = []
+    active_count = 0
 
-    return AcquisitionListResponse(
+    for acq in acquisitions:
+        # Get user data
+        user = auth_service.get_user_by_id(acq.user_id)
+
+        if not user:
+            # Skip if user not found (should not happen in normal operation)
+            continue
+
+        # Build response with user + acquisition data
+        items.append(
+            CourseStudentResponse(
+                user_id=acq.user_id,
+                user_name=user.name or user.email,
+                user_email=user.email,
+                user_avatar=user.avatar_url,
+                acquisition_type=acq.acquisition_type,
+                status=acq.status,
+                granted_at=acq.granted_at,
+                expires_at=acq.expires_at,
+                is_active=acq.is_active(),
+            )
+        )
+
+        if acq.is_active():
+            active_count += 1
+
+    return CourseStudentsListResponse(
         items=items,
         total=len(items),
+        active_count=active_count,
         has_more=len(items) >= limit,
     )
 

@@ -418,6 +418,9 @@ def create_app() -> FastAPI:
 
 
 # Configure router dependencies before creating app
+from src.acquisitions.dependencies import (  # noqa: E402
+    set_auth_service_getter as set_acquisitions_auth_service_getter,
+)
 from src.auth.router import set_auth_service_getter  # noqa: E402
 from src.auth.verification_router import (  # noqa: E402
     set_verification_service_getter,
@@ -442,6 +445,7 @@ set_course_service_getter(get_course_service)
 set_module_service_getter(get_module_service)
 set_lesson_service_getter(get_lesson_service)
 set_notification_service_getter(get_notification_service)
+set_acquisitions_auth_service_getter(get_auth_service)
 
 
 app = create_app()
