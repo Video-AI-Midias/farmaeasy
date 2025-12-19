@@ -175,6 +175,11 @@ class AuthService:
             SET email = ?, updated_at = ?
             WHERE id = ?
         """)
+        self._list_users_by_role = self.session.prepare(f"""
+            SELECT * FROM {self.keyspace}.users
+            WHERE is_active = true AND role = ?
+            ALLOW FILTERING
+        """)
 
         # Refresh token queries
         self._get_token_by_jti = self.session.prepare(
@@ -911,12 +916,7 @@ class AuthService:
         Returns:
             List of User instances with the specified role
         """
-        rows = self.session.execute(
-            f"""SELECT * FROM {self.keyspace}.users
-                WHERE is_active = true AND role = ?
-                ALLOW FILTERING""",
-            [role.value],
-        )
+        rows = self.session.execute(self._list_users_by_role, [role.value])
         return [User.from_row(row) for row in rows]
 
     def search_users(
@@ -925,10 +925,10 @@ class AuthService:
         role: UserRole | None = None,
         limit: int = 50,
     ) -> list[User]:
-        """Search users by email/name and optionally filter by role.
+        """Search users by email/name/cpf/rg/phone and optionally filter by role.
 
         Args:
-            search: Search term (matches email or name, case-insensitive)
+            search: Search term (matches email, name, cpf, rg or phone - case-insensitive, partial match)
             role: Optional role filter
             limit: Max results to return
 
@@ -944,7 +944,13 @@ class AuthService:
             users = [
                 u
                 for u in users
-                if search_lower in u.email.lower() or search_lower in u.name.lower()
+                if (
+                    search_lower in u.email.lower()
+                    or (u.name and search_lower in u.name.lower())
+                    or (u.cpf and search_lower in u.cpf.lower())
+                    or (u.rg and search_lower in u.rg.lower())
+                    or (u.phone and search_lower in u.phone.lower())
+                )
             ]
 
         return users[:limit]

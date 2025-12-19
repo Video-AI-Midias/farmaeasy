@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
 import { cn } from "@/lib/utils";
-import type { Acquisition } from "@/types/acquisitions";
+import type { CourseStudentResponse } from "@/types/acquisitions";
 import { AcquisitionStatus, AcquisitionType } from "@/types/acquisitions";
 import { AlertCircle, Loader2, UserMinus, UserPlus, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -74,7 +74,7 @@ const statusColors: Record<AcquisitionStatus, string> = {
 };
 
 export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPanelProps) {
-  const [students, setStudents] = useState<Acquisition[]>([]);
+  const [students, setStudents] = useState<CourseStudentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGrantDialogOpen, setIsGrantDialogOpen] = useState(false);
@@ -188,53 +188,53 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.map((acquisition) => (
-                  <TableRow key={acquisition.acquisition_id}>
+                {students.map((student) => (
+                  <TableRow key={student.user_id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {getInitials(acquisition.user_id.slice(0, 4))}
+                            {getInitials(student.user_name)}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {acquisition.user_id.slice(0, 8)}...
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{student.user_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {student.user_email}
+                          </span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={cn(
-                          "text-xs",
-                          acquisitionTypeColors[acquisition.acquisition_type],
-                        )}
+                        className={cn("text-xs", acquisitionTypeColors[student.acquisition_type])}
                       >
-                        {acquisitionTypeLabels[acquisition.acquisition_type]}
+                        {acquisitionTypeLabels[student.acquisition_type]}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={cn("text-xs", statusColors[acquisition.status])}
+                        className={cn("text-xs", statusColors[student.status])}
                       >
-                        {statusLabels[acquisition.status]}
+                        {statusLabels[student.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(acquisition.granted_at)}</TableCell>
+                    <TableCell>{formatDate(student.granted_at)}</TableCell>
                     <TableCell>
-                      {acquisition.expires_at ? formatDate(acquisition.expires_at) : "—"}
+                      {student.expires_at ? formatDate(student.expires_at) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {acquisition.status === AcquisitionStatus.ACTIVE && (
+                      {student.status === AcquisitionStatus.ACTIVE && (
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
-                          onClick={() => handleRevokeAccess(acquisition.user_id)}
-                          disabled={revokingId === acquisition.user_id}
+                          onClick={() => handleRevokeAccess(student.user_id)}
+                          disabled={revokingId === student.user_id}
                         >
-                          {revokingId === acquisition.user_id ? (
+                          {revokingId === student.user_id ? (
                             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                           ) : (
                             <UserMinus className="mr-1 h-4 w-4" />
