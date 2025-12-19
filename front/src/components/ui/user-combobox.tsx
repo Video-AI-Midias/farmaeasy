@@ -144,8 +144,6 @@ export function UserCombobox({
             <Button
               type="button"
               variant="outline"
-              role="combobox"
-              aria-expanded={open}
               className={cn(
                 "w-full justify-between",
                 !value && "text-muted-foreground",

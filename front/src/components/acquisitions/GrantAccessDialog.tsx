@@ -176,7 +176,6 @@ export function GrantAccessDialog({
                     value={field.value}
                     onValueChange={field.onChange}
                     onUserSelect={handleUserSelect}
-                    role="student"
                     label="Usuario"
                     placeholder="Buscar por email ou nome..."
                     required

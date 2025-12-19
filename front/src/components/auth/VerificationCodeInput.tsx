@@ -9,6 +9,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const CODE_LENGTH = 6;
+const INPUT_KEYS = Array.from({ length: CODE_LENGTH }, (_, i) => `input-${i}`);
 
 interface VerificationCodeInputProps {
   value: string;
@@ -124,9 +125,9 @@ export function VerificationCodeInput({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex justify-center gap-2 sm:gap-3">
-        {Array.from({ length: CODE_LENGTH }).map((_, index) => (
+        {INPUT_KEYS.map((key, index) => (
           <Input
-            key={index}
+            key={key}
             ref={(el) => {
               inputRefs.current[index] = el;
             }}

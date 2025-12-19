@@ -432,8 +432,8 @@ function StudentHomeContent() {
               <CardContent>
                 {isLoadingEnrollments || isLoadingCourses ? (
                   <div className="space-y-4">
-                    {Array.from({ length: 2 }).map((_, i) => (
-                      <div key={`enrollment-skeleton-${i}`} className="flex items-center gap-4">
+                    {["enrollment-skeleton-1", "enrollment-skeleton-2"].map((key) => (
+                      <div key={key} className="flex items-center gap-4">
                         <Skeleton className="h-16 w-16 rounded-lg" />
                         <div className="flex-1 space-y-2">
                           <Skeleton className="h-4 w-3/4" />
@@ -479,8 +479,13 @@ function StudentHomeContent() {
               <CardContent>
                 {isLoadingCourses ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={`course-skeleton-${i}`} className="flex items-start gap-4">
+                    {[
+                      "course-skeleton-1",
+                      "course-skeleton-2",
+                      "course-skeleton-3",
+                      "course-skeleton-4",
+                    ].map((key) => (
+                      <div key={key} className="flex items-start gap-4">
                         <Skeleton className="h-20 w-20 rounded-lg" />
                         <div className="flex-1 space-y-2">
                           <Skeleton className="h-4 w-3/4" />
@@ -526,8 +531,12 @@ function StudentHomeContent() {
               <CardContent className="p-0">
                 {isLoadingNotifications ? (
                   <div className="p-4 space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={`notification-skeleton-${i}`} className="flex items-start gap-3">
+                    {[
+                      "student-notification-skeleton-1",
+                      "student-notification-skeleton-2",
+                      "student-notification-skeleton-3",
+                    ].map((key) => (
+                      <div key={key} className="flex items-start gap-3">
                         <Skeleton className="h-10 w-10 rounded-full" />
                         <div className="flex-1 space-y-2">
                           <Skeleton className="h-4 w-3/4" />

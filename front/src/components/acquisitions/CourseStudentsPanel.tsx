@@ -152,8 +152,7 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
 
   useEffect(() => {
     fetchStudents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId]);
+  }, [fetchStudents]);
 
   const handleGrantSuccess = async () => {
     toast.success("Acesso concedido com sucesso!", {
@@ -236,8 +235,8 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <StudentRowSkeleton key={i} />
+                {["skeleton-row-1", "skeleton-row-2", "skeleton-row-3"].map((key) => (
+                  <StudentRowSkeleton key={key} />
                 ))}
               </TableBody>
             </Table>
