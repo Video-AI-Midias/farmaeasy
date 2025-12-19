@@ -15,6 +15,10 @@ HTML templates following FarmaEasy visual identity:
 
 from datetime import datetime
 
+# FarmaEasy logo URL (served from frontend public folder)
+# 200px width, 8.2KB, optimized for email clients
+LOGO_URL = "https://farmaeasy.com.br/logo-email.png"
+
 
 # ==============================================================================
 # Base Template
@@ -88,10 +92,14 @@ BASE_TEMPLATE = """
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <!-- Logo Text (since image may not load) -->
-                    <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #4A8F5B; letter-spacing: -0.5px;">
-                      FarmaEasy
-                    </h1>
+                    <!-- Logo Image -->
+                    <img
+                      src="https://farmaeasy.com.br/logo-email.png"
+                      alt="FarmaEasy"
+                      width="200"
+                      height="36"
+                      style="display: block; margin: 0 auto; max-width: 200px; height: auto;"
+                    />
                   </td>
                 </tr>
               </table>
