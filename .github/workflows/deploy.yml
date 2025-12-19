@@ -223,6 +223,11 @@ jobs:
             blue-green-deploy.sh \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
 
+          # Sync nginx production config
+          rsync -avz \
+            docker/nginx/nginx-prod.conf \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/docker/nginx/
+
           # Sync API .env file (if not exists on server, copy from example)
           rsync -avz \
             --ignore-existing \
@@ -249,6 +254,27 @@ jobs:
             export ORG="$ORG"
             export IMAGE_NAME="$IMAGE_NAME"
             export IMAGE_TAG="$IMAGE_TAG"
+
+            # Update nginx config if changed (with backup and validation)
+            NGINX_SRC="${{ env.REMOTE_DIR }}/docker/nginx/nginx-prod.conf"
+            NGINX_DEST="/etc/nginx/sites-available/api.farmaeasy.com.br"
+            if [ -f "\$NGINX_SRC" ]; then
+              if ! diff -q "\$NGINX_SRC" "\$NGINX_DEST" > /dev/null 2>&1; then
+                echo "Updating nginx configuration..."
+                sudo cp "\$NGINX_DEST" "\$NGINX_DEST.bak.\$(date +%Y%m%d_%H%M%S)"
+                sudo cp "\$NGINX_SRC" "\$NGINX_DEST"
+                if sudo nginx -t; then
+                  sudo nginx -s reload
+                  echo "Nginx configuration updated successfully"
+                else
+                  echo "Nginx config invalid, restoring backup..."
+                  sudo cp "\$NGINX_DEST.bak.*" "\$NGINX_DEST" 2>/dev/null || true
+                  sudo nginx -s reload
+                fi
+              else
+                echo "Nginx configuration unchanged, skipping update"
+              fi
+            fi
 
             # Execute blue/green deploy
             ./blue-green-deploy.sh deploy "$IMAGE_TAG"
