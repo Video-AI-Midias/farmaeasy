@@ -433,40 +433,40 @@
 
 /* ==========================================================================
    LINE CLAMP FIX - Tailwind v4 built-in line-clamp não funciona corretamente
-   Aumentando especificidade com seletor [class*] para sobrescrever Tailwind
+   Usando especificidade alta (0,2,0) repetindo seletor de classe
    ========================================================================== */
-[class*="line-clamp-1"],
-[class*="line-clamp-2"],
-[class*="line-clamp-3"],
-[class*="line-clamp-4"],
-[class*="line-clamp-5"],
-[class*="line-clamp-6"] {
+.line-clamp-1.line-clamp-1,
+.line-clamp-2.line-clamp-2,
+.line-clamp-3.line-clamp-3,
+.line-clamp-4.line-clamp-4,
+.line-clamp-5.line-clamp-5,
+.line-clamp-6.line-clamp-6 {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-[class*="line-clamp-1"] {
+.line-clamp-1.line-clamp-1 {
   -webkit-line-clamp: 1;
 }
 
-[class*="line-clamp-2"] {
+.line-clamp-2.line-clamp-2 {
   -webkit-line-clamp: 2;
 }
 
-[class*="line-clamp-3"] {
+.line-clamp-3.line-clamp-3 {
   -webkit-line-clamp: 3;
 }
 
-[class*="line-clamp-4"] {
+.line-clamp-4.line-clamp-4 {
   -webkit-line-clamp: 4;
 }
 
-[class*="line-clamp-5"] {
+.line-clamp-5.line-clamp-5 {
   -webkit-line-clamp: 5;
 }
 
-[class*="line-clamp-6"] {
+.line-clamp-6.line-clamp-6 {
   -webkit-line-clamp: 6;
 }
