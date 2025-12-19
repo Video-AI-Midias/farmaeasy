@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { cn } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
 import { ContentStatus, ContentType } from "@/types/courses";
@@ -205,9 +206,12 @@ export function LessonSelector({
                               </Badge>
                             </div>
                             {lesson.description && (
-                              <p className="text-sm text-muted-foreground mt-1 text-truncate-1">
+                              <TruncatedText
+                                lines={1}
+                                className="text-sm text-muted-foreground mt-1"
+                              >
                                 {lesson.description}
-                              </p>
+                              </TruncatedText>
                             )}
                             {lesson.duration_seconds && (
                               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">

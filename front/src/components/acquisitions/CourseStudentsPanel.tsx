@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
 import { cn } from "@/lib/utils";
 import type { CourseStudentResponse } from "@/types/acquisitions";
@@ -356,10 +357,12 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium">{student.user_name}</span>
-                              <span className="text-xs text-muted-foreground">
+                              <TruncatedText lines={1} className="text-sm font-medium">
+                                {student.user_name}
+                              </TruncatedText>
+                              <TruncatedText lines={1} className="text-xs text-muted-foreground">
                                 {student.user_email}
-                              </span>
+                              </TruncatedText>
                             </div>
                           </div>
                         </TableCell>

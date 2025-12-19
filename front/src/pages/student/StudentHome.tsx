@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { useAuth } from "@/hooks/useAuth";
 import { coursesApi } from "@/lib/courses-api";
 import { cn } from "@/lib/utils";
@@ -137,7 +138,9 @@ function CourseEnrollmentCard({ enrollment, course }: CourseEnrollmentCardProps)
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="font-medium leading-tight text-truncate-1">{course.title}</h3>
+                <TruncatedText lines={1} className="font-medium leading-tight">
+                  {course.title}
+                </TruncatedText>
                 <p className="text-sm text-muted-foreground">
                   {enrollment.lessons_completed} de {enrollment.lessons_total} aulas
                 </p>
@@ -208,11 +211,13 @@ function AvailableCourseCard({ course, isEnrolled }: AvailableCourseCardProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium leading-tight text-truncate-1">{course.title}</h3>
+            <TruncatedText lines={1} className="font-medium leading-tight">
+              {course.title}
+            </TruncatedText>
             {course.description && (
-              <p className="mt-1 text-sm text-muted-foreground text-truncate-2">
+              <TruncatedText lines={2} className="mt-1 text-sm text-muted-foreground">
                 {course.description}
-              </p>
+              </TruncatedText>
             )}
             <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
               <BookOpen className="h-3 w-3" />

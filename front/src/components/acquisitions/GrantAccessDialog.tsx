@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { UserCombobox } from "@/components/ui/user-combobox";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
 import type { User } from "@/types/auth";
@@ -189,8 +190,12 @@ export function GrantAccessDialog({
             {/* Selected user preview */}
             {selectedUser && (
               <div className="rounded-lg border bg-muted/50 p-3">
-                <p className="text-sm font-medium">{selectedUser.name || selectedUser.email}</p>
-                <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+                <TruncatedText lines={1} className="text-sm font-medium">
+                  {selectedUser.name || selectedUser.email}
+                </TruncatedText>
+                <TruncatedText lines={1} className="text-xs text-muted-foreground">
+                  {selectedUser.email}
+                </TruncatedText>
               </div>
             )}
 

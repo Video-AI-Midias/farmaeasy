@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { cn } from "@/lib/utils";
 import { ContentStatus, type ModuleInCourse } from "@/types/courses";
 import { useSortable } from "@dnd-kit/sortable";
@@ -107,9 +108,9 @@ export function ModuleCard({
               </Badge>
             </div>
             {module.description && (
-              <p className="mt-1 text-sm text-muted-foreground text-truncate-1">
+              <TruncatedText lines={1} className="mt-1 text-sm text-muted-foreground">
                 {module.description}
-              </p>
+              </TruncatedText>
             )}
             <div className="mt-1 text-xs text-muted-foreground">
               {module.lesson_count} {module.lesson_count === 1 ? "aula" : "aulas"}

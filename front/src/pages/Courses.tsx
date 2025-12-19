@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { cn } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
 import {
@@ -224,9 +225,9 @@ function CoursesContent() {
                         <div>
                           <p className="font-medium">{course.title}</p>
                           {course.description && (
-                            <p className="text-sm text-muted-foreground text-truncate-1">
+                            <TruncatedText lines={1} className="text-sm text-muted-foreground">
                               {course.description}
-                            </p>
+                            </TruncatedText>
                           )}
                         </div>
                       </TableCell>

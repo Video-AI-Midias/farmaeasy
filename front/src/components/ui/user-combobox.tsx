@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { useUserSearch } from "@/hooks/useUserSearch";
 import { cn } from "@/lib/utils";
 import type { User, UserRole } from "@/types/auth";
@@ -120,10 +121,12 @@ export function UserCombobox({
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
-              <p className="text-sm font-medium leading-none">
+              <TruncatedText lines={1} className="text-sm font-medium leading-none">
                 {selectedUser.name || selectedUser.email}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{selectedUser.email}</p>
+              </TruncatedText>
+              <TruncatedText lines={1} className="text-xs text-muted-foreground mt-0.5">
+                {selectedUser.email}
+              </TruncatedText>
             </div>
           </div>
           <Button
@@ -218,10 +221,12 @@ export function UserCombobox({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-1 flex-col items-start gap-0.5 text-left">
-                          <p className="text-sm font-medium leading-none">
+                          <TruncatedText lines={1} className="text-sm font-medium leading-none">
                             {user.name || user.email}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          </TruncatedText>
+                          <TruncatedText lines={1} className="text-xs text-muted-foreground">
+                            {user.email}
+                          </TruncatedText>
                         </div>
                         {value === user.id && (
                           <Check className="h-4 w-4 flex-shrink-0 text-primary" />

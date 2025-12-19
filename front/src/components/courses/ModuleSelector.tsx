@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { cn } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
 import { ContentStatus } from "@/types/courses";
@@ -135,9 +136,9 @@ export function ModuleSelector({
                           </Badge>
                         </div>
                         {module.description && (
-                          <p className="text-sm text-muted-foreground mt-1 text-truncate-2">
+                          <TruncatedText lines={2} className="text-sm text-muted-foreground mt-1">
                             {module.description}
-                          </p>
+                          </TruncatedText>
                         )}
                         <div className="text-xs text-muted-foreground mt-1">
                           {module.lesson_count} {module.lesson_count === 1 ? "aula" : "aulas"}

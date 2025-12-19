@@ -10,6 +10,7 @@
  */
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import { cn } from "@/lib/utils";
 import type { Notification, NotificationType } from "@/types/notifications";
 import { AtSign, Bell, Heart, MessageSquare } from "lucide-react";
@@ -125,7 +126,9 @@ export function NotificationItem({ notification, onClick }: NotificationItemProp
           {notification.title}
         </p>
         {notification.message && (
-          <p className="text-xs text-muted-foreground text-truncate-2">{notification.message}</p>
+          <TruncatedText lines={2} className="text-xs text-muted-foreground">
+            {notification.message}
+          </TruncatedText>
         )}
         <p className="text-xs text-muted-foreground">
           {formatRelativeTime(notification.created_at)}
