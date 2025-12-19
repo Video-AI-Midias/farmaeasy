@@ -5,6 +5,7 @@
  * - Search users by email/name
  * - Grant permanent or temporary access
  * - Add optional notes
+ * - Improved UX with loading states and feedback
  */
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ import { UserCombobox } from "@/components/ui/user-combobox";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
 import type { User } from "@/types/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, UserPlus } from "lucide-react";
+import { CheckCircle2, Loader2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -102,7 +103,16 @@ export function GrantAccessDialog({
   };
 
   const handleSubmit = form.handleSubmit(async (data) => {
+    if (!selectedUser) {
+      toast.error("Selecione um usuario para conceder acesso");
+      return;
+    }
+
     setIsSubmitting(true);
+    const toastId = toast.loading("Concedendo acesso...", {
+      description: `Para ${selectedUser.name || selectedUser.email}`,
+    });
+
     try {
       await acquisitionsAdminApi.grantAccess({
         user_id: data.user_id,
@@ -111,21 +121,32 @@ export function GrantAccessDialog({
         notes: data.notes,
       });
 
-      toast.success("Acesso concedido com sucesso");
+      toast.success("Acesso concedido com sucesso!", {
+        id: toastId,
+        description: `${selectedUser.name || selectedUser.email} agora tem acesso ao curso`,
+        icon: <CheckCircle2 className="h-4 w-4" />,
+        duration: 3000,
+      });
+
       form.reset();
       setSelectedUser(null);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao conceder acesso";
-      toast.error(message);
+      const message = error instanceof Error ? error.message : "Erro inesperado ao conceder acesso";
+
+      toast.error("Falha ao conceder acesso", {
+        id: toastId,
+        description: message,
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
   });
 
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
+    if (!newOpen && !isSubmitting) {
       form.reset();
       setSelectedUser(null);
     }
@@ -160,10 +181,19 @@ export function GrantAccessDialog({
                     placeholder="Buscar por email ou nome..."
                     required
                     error={fieldState.error?.message}
+                    disabled={isSubmitting}
                   />
                 </FormItem>
               )}
             />
+
+            {/* Selected user preview */}
+            {selectedUser && (
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-sm font-medium">{selectedUser.name || selectedUser.email}</p>
+                <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+              </div>
+            )}
 
             {/* Access type */}
             <FormField
@@ -177,14 +207,19 @@ export function GrantAccessDialog({
                       onValueChange={field.onChange}
                       value={field.value}
                       className="flex flex-col gap-2"
+                      disabled={isSubmitting}
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="permanent" id="permanent" />
-                        <Label htmlFor="permanent">Permanente</Label>
+                        <RadioGroupItem value="permanent" id="permanent" disabled={isSubmitting} />
+                        <Label htmlFor="permanent" className="font-normal">
+                          Permanente
+                        </Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="temporary" id="temporary" />
-                        <Label htmlFor="temporary">Temporario</Label>
+                        <RadioGroupItem value="temporary" id="temporary" disabled={isSubmitting} />
+                        <Label htmlFor="temporary" className="font-normal">
+                          Temporario
+                        </Label>
                       </div>
                     </RadioGroup>
                   </FormControl>
@@ -204,6 +239,7 @@ export function GrantAccessDialog({
                     <Select
                       onValueChange={(v) => field.onChange(Number(v))}
                       value={field.value?.toString() ?? ""}
+                      disabled={isSubmitting}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -213,11 +249,11 @@ export function GrantAccessDialog({
                       <SelectContent>
                         <SelectItem value="7">7 dias</SelectItem>
                         <SelectItem value="14">14 dias</SelectItem>
-                        <SelectItem value="30">30 dias</SelectItem>
-                        <SelectItem value="60">60 dias</SelectItem>
-                        <SelectItem value="90">90 dias</SelectItem>
-                        <SelectItem value="180">180 dias</SelectItem>
-                        <SelectItem value="365">365 dias</SelectItem>
+                        <SelectItem value="30">30 dias (1 mês)</SelectItem>
+                        <SelectItem value="60">60 dias (2 meses)</SelectItem>
+                        <SelectItem value="90">90 dias (3 meses)</SelectItem>
+                        <SelectItem value="180">180 dias (6 meses)</SelectItem>
+                        <SelectItem value="365">365 dias (1 ano)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -239,13 +275,15 @@ export function GrantAccessDialog({
                   <FormControl>
                     <Textarea
                       placeholder="Motivo da concessao, observacoes..."
-                      className="min-h-[80px]"
+                      className="min-h-[80px] resize-none"
                       {...field}
                       value={field.value || ""}
+                      disabled={isSubmitting}
+                      maxLength={500}
                     />
                   </FormControl>
                   <FormDescription>
-                    Anotacoes internas sobre esta concessao de acesso
+                    Anotacoes internas sobre esta concessao de acesso (máx. 500 caracteres)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -253,12 +291,26 @@ export function GrantAccessDialog({
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
+              >
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting || !selectedUser}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Conceder Acesso
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Concedendo...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Conceder Acesso
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>
