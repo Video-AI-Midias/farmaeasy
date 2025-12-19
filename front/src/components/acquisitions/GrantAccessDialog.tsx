@@ -25,7 +25,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -36,12 +35,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { UserCombobox } from "@/components/ui/user-combobox";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
-import { usersAdminApi } from "@/lib/users-api";
 import type { User } from "@/types/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Search, UserPlus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Loader2, UserPlus } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -77,9 +76,6 @@ export function GrantAccessDialog({
   courseTitle,
   onSuccess,
 }: GrantAccessDialogProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -95,41 +91,14 @@ export function GrantAccessDialog({
 
   const accessType = form.watch("access_type");
 
-  // Search users with debounce
-  const searchUsers = useCallback(async (term: string) => {
-    if (term.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const result = await usersAdminApi.searchUsers({
-        search: term,
-        role: "student",
-        limit: 10,
-      });
-      setSearchResults(result.items);
-    } catch {
-      toast.error("Erro ao buscar usuarios");
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchUsers(searchTerm);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, searchUsers]);
-
-  const handleSelectUser = (user: User) => {
+  const handleUserSelect = (user: User | null) => {
     setSelectedUser(user);
-    form.setValue("user_id", user.id);
-    setSearchResults([]);
-    setSearchTerm("");
+    if (user) {
+      form.setValue("user_id", user.id);
+      form.clearErrors("user_id");
+    } else {
+      form.setValue("user_id", "");
+    }
   };
 
   const handleSubmit = form.handleSubmit(async (data) => {
@@ -159,8 +128,6 @@ export function GrantAccessDialog({
     if (!newOpen) {
       form.reset();
       setSelectedUser(null);
-      setSearchTerm("");
-      setSearchResults([]);
     }
     onOpenChange(newOpen);
   };
@@ -182,59 +149,18 @@ export function GrantAccessDialog({
             <FormField
               control={form.control}
               name="user_id"
-              render={() => (
+              render={({ field, fieldState }) => (
                 <FormItem>
-                  <FormLabel>Usuario *</FormLabel>
-                  {selectedUser ? (
-                    <div className="flex items-center justify-between rounded-md border p-3">
-                      <div>
-                        <p className="font-medium">{selectedUser.name}</p>
-                        <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(null);
-                          form.setValue("user_id", "");
-                        }}
-                      >
-                        Alterar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar por email ou nome..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-9"
-                        />
-                        {isSearching && (
-                          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin" />
-                        )}
-                      </div>
-                      {searchResults.length > 0 && (
-                        <div className="max-h-40 overflow-y-auto rounded-md border">
-                          {searchResults.map((user) => (
-                            <button
-                              key={user.id}
-                              type="button"
-                              className="w-full px-3 py-2 text-left hover:bg-muted"
-                              onClick={() => handleSelectUser(user)}
-                            >
-                              <p className="font-medium">{user.name}</p>
-                              <p className="text-sm text-muted-foreground">{user.email}</p>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <FormMessage />
+                  <UserCombobox
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    onUserSelect={handleUserSelect}
+                    role="student"
+                    label="Usuario"
+                    placeholder="Buscar por email ou nome..."
+                    required
+                    error={fieldState.error?.message}
+                  />
                 </FormItem>
               )}
             />

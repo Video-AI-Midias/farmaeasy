@@ -55,6 +55,27 @@ export interface AcquisitionListResponse {
   has_more: boolean;
 }
 
+export interface CourseStudentResponse {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_avatar: string | null;
+  acquisition_type: AcquisitionType;
+  status: AcquisitionStatus;
+  granted_at: string;
+  expires_at: string | null;
+  progress_percent?: number;
+  is_active: boolean;
+}
+
+export interface CourseStudentsListResponse {
+  items: CourseStudentResponse[];
+  total: number;
+  active_count: number;
+  has_more: boolean;
+  next_cursor?: string | null;
+}
+
 export interface CheckAccessResponse {
   has_access: boolean;
   access_reason: AccessReason | null;

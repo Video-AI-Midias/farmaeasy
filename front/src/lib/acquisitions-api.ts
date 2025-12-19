@@ -12,6 +12,7 @@ import type {
   BatchGrantAccessRequest,
   BatchGrantAccessResponse,
   CheckAccessResponse,
+  CourseStudentsListResponse,
   GrantAccessRequest,
   RevokeAccessRequest,
   StudentCountResponse,
@@ -96,9 +97,13 @@ export const acquisitionsAdminApi = {
 
   /**
    * List all users with access to a specific course.
+   * Returns full user information (name, email, avatar) along with acquisition details.
    */
-  getCourseStudents: async (courseId: string, limit = 100): Promise<AcquisitionListResponse> => {
-    const response = await api.get<AcquisitionListResponse>(
+  getCourseStudents: async (
+    courseId: string,
+    limit = 100,
+  ): Promise<CourseStudentsListResponse> => {
+    const response = await api.get<CourseStudentsListResponse>(
       `/admin/acquisitions/course/${courseId}/students?limit=${limit}`,
     );
     return response.data;
