@@ -26,6 +26,7 @@ from .dependencies import (
 )
 from .schemas import (
     AddReactionRequest,
+    BlockUserRequest,
     CommentListResponse,
     CommentResponse,
     CreateCommentRequest,
@@ -35,7 +36,10 @@ from .schemas import (
     RatingStatsResponse,
     ReportListResponse,
     ReportResponse,
+    UnblockUserRequest,
     UpdateCommentRequest,
+    UserBlockListResponse,
+    UserBlockResponse,
 )
 from .service import (
     CommentError,
@@ -485,4 +489,129 @@ async def moderate_report(
     return MessageResponse(
         message=f"Denuncia processada com acao: {data.action}",
         success=True,
+    )
+
+
+# ==============================================================================
+# User Blocking Endpoints
+# ==============================================================================
+
+
+@router.post(
+    "/users/{user_id}/block",
+    response_model=UserBlockResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Block user from commenting",
+    description="Block a user from creating comments. Requires moderator privileges.",
+)
+async def block_user(
+    user_id: UUID,
+    data: BlockUserRequest,
+    comment_service: CommentServiceDep,
+    user: AdminUser,
+) -> UserBlockResponse:
+    """Block a user from commenting.
+
+    Requires admin/moderator privileges.
+    """
+    if not is_moderator(user):
+        raise CommentError("Apenas moderadores podem bloquear usuarios")
+
+    return await comment_service.block_user(
+        user_id=user_id,
+        moderator_id=UUID(str(user.id)),
+        reason=data.reason,
+        moderator_notes=data.moderator_notes,
+        duration_days=data.duration_days,
+    )
+
+
+@router.post(
+    "/users/{user_id}/blocks/{block_id}/unblock",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Unblock user",
+    description="Remove a block from a user. Requires moderator privileges.",
+)
+async def unblock_user(
+    user_id: UUID,
+    block_id: UUID,
+    data: UnblockUserRequest,
+    comment_service: CommentServiceDep,
+    user: AdminUser,
+) -> MessageResponse:
+    """Unblock a user by removing a specific block.
+
+    Requires admin/moderator privileges.
+    """
+    if not is_moderator(user):
+        raise CommentError("Apenas moderadores podem desbloquear usuarios")
+
+    success = await comment_service.unblock_user(
+        user_id=user_id,
+        block_id=block_id,
+        moderator_id=UUID(str(user.id)),
+        notes=data.notes,
+    )
+
+    if not success:
+        raise CommentNotFoundError("Bloqueio nao encontrado")
+
+    return MessageResponse(
+        message="Usuario desbloqueado com sucesso",
+        success=True,
+    )
+
+
+@router.get(
+    "/users/{user_id}/blocks",
+    response_model=UserBlockListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get user blocks",
+    description="List all blocks for a user. Requires moderator privileges.",
+)
+async def get_user_blocks(
+    user_id: UUID,
+    comment_service: CommentServiceDep,
+    user: AdminUser,
+    limit: int = Query(20, ge=1, le=100),
+) -> UserBlockListResponse:
+    """Get all blocks for a user.
+
+    Requires admin/moderator privileges.
+    """
+    if not is_moderator(user):
+        raise CommentError("Apenas moderadores podem ver bloqueios")
+
+    return await comment_service.get_user_blocks(user_id=user_id, limit=limit)
+
+
+@router.get(
+    "/users/{user_id}/blocked",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Check if user is blocked",
+    description="Check if a user is currently blocked from commenting. Users can check their own status, moderators can check any user.",
+)
+async def check_user_blocked(
+    user_id: UUID,
+    comment_service: CommentServiceDep,
+    current_user: CurrentUser,
+) -> MessageResponse:
+    """Check if a user is currently blocked.
+
+    Security:
+        - Requires authentication
+        - Users can only check their own status
+        - Moderators can check any user's status
+    """
+    # Security: Users can only check their own status (unless moderator)
+    if not is_moderator(current_user) and UUID(str(current_user.id)) != user_id:
+        raise CommentError("Usuarios podem verificar apenas seu proprio status")
+
+    is_blocked = await comment_service.is_user_blocked(user_id)
+
+    return MessageResponse(
+        message="Usuario bloqueado" if is_blocked else "Usuario nao bloqueado",
+        success=not is_blocked,
     )

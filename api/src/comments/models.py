@@ -12,7 +12,7 @@ Architecture: Adjacency List pattern for hierarchical comments
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -46,6 +46,15 @@ class ReportStatus(str, Enum):
     REVIEWED = "reviewed"
     DISMISSED = "dismissed"
     ACTION_TAKEN = "action_taken"
+
+
+class ModeratorAction(str, Enum):
+    """Types of moderator actions for audit logging."""
+
+    BLOCK_USER = "block_user"
+    UNBLOCK_USER = "unblock_user"
+    DELETE_COMMENT = "delete_comment"
+    MODERATE_REPORT = "moderate_report"
 
 
 # ==============================================================================
@@ -200,6 +209,52 @@ CREATE TABLE IF NOT EXISTS {keyspace}.comment_reports_by_status (
 ) WITH CLUSTERING ORDER BY (created_at DESC, report_id ASC)
 """
 
+# User Comment Blocks Table
+USER_COMMENT_BLOCKS_TABLE_CQL = """
+CREATE TABLE IF NOT EXISTS {keyspace}.user_comment_blocks (
+    user_id UUID,
+    block_id UUID,
+    blocked_at TIMESTAMP,
+    blocked_by UUID,
+    reason TEXT,
+    moderator_notes TEXT,
+    expires_at TIMESTAMP,
+    is_permanent BOOLEAN,
+    PRIMARY KEY ((user_id), blocked_at, block_id)
+) WITH CLUSTERING ORDER BY (blocked_at DESC, block_id ASC)
+"""
+
+# Comment Blocks by Moderator - for moderator activity log
+COMMENT_BLOCKS_BY_MODERATOR_TABLE_CQL = """
+CREATE TABLE IF NOT EXISTS {keyspace}.comment_blocks_by_moderator (
+    moderator_id UUID,
+    user_id UUID,
+    block_id UUID,
+    blocked_at TIMESTAMP,
+    reason TEXT,
+    expires_at TIMESTAMP,
+    PRIMARY KEY ((moderator_id), blocked_at, block_id, user_id)
+) WITH CLUSTERING ORDER BY (blocked_at DESC, block_id ASC, user_id ASC)
+"""
+
+# Moderator Action Audit Log - complete audit trail
+MODERATOR_AUDIT_LOG_TABLE_CQL = """
+CREATE TABLE IF NOT EXISTS {keyspace}.moderator_audit_log (
+    log_id UUID,
+    moderator_id UUID,
+    action TEXT,
+    target_user_id UUID,
+    target_id UUID,
+    performed_at TIMESTAMP,
+    details TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    PRIMARY KEY ((moderator_id), performed_at, log_id)
+) WITH CLUSTERING ORDER BY (performed_at DESC, log_id ASC)
+  AND default_time_to_live = 31536000
+  AND comment = 'Audit log for moderator actions (1 year TTL for compliance)'
+"""
+
 # All table definitions for initialization
 COMMENTS_TABLES_CQL = [
     COMMENT_TABLE_CQL,
@@ -212,6 +267,9 @@ COMMENTS_TABLES_CQL = [
     REACTION_COUNTS_TABLE_CQL,
     REPORT_TABLE_CQL,
     REPORTS_BY_STATUS_TABLE_CQL,
+    USER_COMMENT_BLOCKS_TABLE_CQL,
+    COMMENT_BLOCKS_BY_MODERATOR_TABLE_CQL,
+    MODERATOR_AUDIT_LOG_TABLE_CQL,
 ]
 
 
@@ -440,6 +498,97 @@ class CommentReport:
         )
 
 
+@dataclass
+class UserCommentBlock:
+    """User comment block entity."""
+
+    block_id: UUID
+    user_id: UUID
+    blocked_at: datetime
+    blocked_by: UUID
+    reason: str
+    moderator_notes: str | None = None
+    expires_at: datetime | None = None
+    is_permanent: bool = True
+
+    @classmethod
+    def from_row(cls, row: Any) -> "UserCommentBlock":
+        """Create entity from Cassandra row."""
+        return cls(
+            block_id=row.block_id,
+            user_id=row.user_id,
+            blocked_at=row.blocked_at,
+            blocked_by=row.blocked_by,
+            reason=row.reason,
+            moderator_notes=row.moderator_notes,
+            expires_at=row.expires_at,
+            is_permanent=row.is_permanent if row.is_permanent is not None else True,
+        )
+
+    def is_active(self) -> bool:
+        """Check if the block is currently active.
+
+        Returns:
+            True if block is active (permanent or not yet expired), False otherwise
+        """
+        if self.is_permanent:
+            return True
+        if self.expires_at is None:
+            return False
+        return datetime.now(UTC) < self.expires_at
+
+
+@dataclass
+class ModeratorAuditLog:
+    """Audit log entry for moderator actions."""
+
+    log_id: UUID
+    moderator_id: UUID
+    action: ModeratorAction
+    target_user_id: UUID | None
+    target_id: UUID | None
+    performed_at: datetime
+    details: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+
+    @classmethod
+    def from_row(cls, row: Any) -> "ModeratorAuditLog":
+        """Create entity from Cassandra row."""
+        return cls(
+            log_id=row.log_id,
+            moderator_id=row.moderator_id,
+            action=ModeratorAction(row.action),
+            target_user_id=row.target_user_id,
+            target_id=row.target_id,
+            performed_at=row.performed_at,
+            details=row.details,
+            ip_address=row.ip_address,
+            user_agent=row.user_agent,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "block_id": str(self.block_id),
+            "user_id": str(self.user_id),
+            "blocked_at": self.blocked_at.isoformat(),
+            "blocked_by": str(self.blocked_by),
+            "reason": self.reason,
+            "moderator_notes": self.moderator_notes,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "is_permanent": self.is_permanent,
+        }
+
+    def is_active(self) -> bool:
+        """Check if block is still active."""
+        if self.is_permanent:
+            return True
+        if self.expires_at is None:
+            return False
+        return datetime.now(UTC) < self.expires_at
+
+
 # ==============================================================================
 # Factory Functions
 # ==============================================================================
@@ -501,4 +650,64 @@ def create_report(
         moderator_notes=None,
         created_at=now,
         reviewed_at=None,
+    )
+
+
+def create_user_block(
+    user_id: UUID,
+    blocked_by: UUID,
+    reason: str,
+    moderator_notes: str | None = None,
+    duration_days: int | None = None,
+) -> UserCommentBlock:
+    """Create a new user comment block."""
+    now = datetime.now(UTC)
+    is_permanent = duration_days is None
+    expires_at = None if is_permanent else now + timedelta(days=duration_days)
+
+    return UserCommentBlock(
+        block_id=uuid4(),
+        user_id=user_id,
+        blocked_at=now,
+        blocked_by=blocked_by,
+        reason=reason,
+        moderator_notes=moderator_notes,
+        expires_at=expires_at,
+        is_permanent=is_permanent,
+    )
+
+
+def create_audit_log(
+    moderator_id: UUID,
+    action: ModeratorAction,
+    target_user_id: UUID | None = None,
+    target_id: UUID | None = None,
+    details: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> ModeratorAuditLog:
+    """Create a moderator audit log entry.
+
+    Args:
+        moderator_id: ID of the moderator performing the action
+        action: Type of moderator action (from ModeratorAction enum)
+        target_user_id: ID of the user being moderated (optional)
+        target_id: ID of the specific entity (block_id, comment_id, etc)
+        details: Additional details about the action (JSON string or text)
+        ip_address: IP address of the moderator (for security audit)
+        user_agent: User agent of the moderator (for security audit)
+
+    Returns:
+        ModeratorAuditLog instance ready to be inserted
+    """
+    return ModeratorAuditLog(
+        log_id=uuid4(),
+        moderator_id=moderator_id,
+        action=action,
+        target_user_id=target_user_id,
+        target_id=target_id,
+        performed_at=datetime.now(UTC),
+        details=details,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

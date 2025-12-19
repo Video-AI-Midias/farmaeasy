@@ -16,20 +16,28 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from fastapi import HTTPException, status
+
 from .models import (
     Comment,
     CommentReply,
     CommentReport,
+    ModeratorAction,
     ReactionType,
     ReportReason,
     ReportStatus,
+    UserCommentBlock,
+    create_audit_log,
     create_comment,
     create_report,
+    create_user_block,
 )
 from .schemas import (
     CommentListResponse,
     CommentResponse,
     RatingStatsResponse,
+    UserBlockListResponse,
+    UserBlockResponse,
     decode_cursor,
     encode_cursor,
 )
@@ -438,12 +446,20 @@ class CommentService:
         """Create a new comment.
 
         Performs:
+        - User blocking check
         - Rate limiting check
         - Spam detection
         - Duplicate check
         - Content sanitization
         - Dual-write to main and by_parent tables
         """
+        # Check if user is blocked from commenting
+        if await self.is_user_blocked(author_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario bloqueado de comentar",
+            )
+
         # Rate limiting
         await self.check_rate_limit(author_id)
 
@@ -1233,3 +1249,268 @@ class CommentService:
         # Also invalidate parent's replies cache if applicable
         if parent_id:
             await self.redis.delete(f"comments:{lesson_id}:{parent_id}")
+
+    # ==============================================================================
+    # User Blocking
+    # ==============================================================================
+
+    async def block_user(
+        self,
+        user_id: UUID,
+        moderator_id: UUID,
+        reason: str,
+        moderator_notes: str | None = None,
+        duration_days: int | None = None,
+    ) -> "UserBlockResponse":
+        """Block a user from commenting.
+
+        Args:
+            user_id: ID of user to block
+            moderator_id: ID of moderator creating the block
+            reason: Reason for blocking (required)
+            moderator_notes: Additional notes for moderators
+            duration_days: Block duration in days (None = permanent)
+
+        Returns:
+            UserBlockResponse with block details
+
+        Raises:
+            HTTPException 400: If moderator tries to block themselves
+            HTTPException 409: If user already has an active block
+        """
+        # Security: Prevent self-blocking (DoS protection)
+        if user_id == moderator_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Moderadores nao podem se auto-bloquear",
+            )
+
+        # Security: Prevent double-blocking (check for active block)
+        existing_block = await self.is_user_blocked(user_id)
+        if existing_block:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Usuario ja possui um bloqueio ativo",
+            )
+
+        # Security: Sanitize text inputs to prevent XSS
+        reason = html.escape(reason)
+        if moderator_notes:
+            moderator_notes = html.escape(moderator_notes)
+
+        # Create block entity
+        block = create_user_block(
+            user_id=user_id,
+            blocked_by=moderator_id,
+            reason=reason,
+            moderator_notes=moderator_notes,
+            duration_days=duration_days,
+        )
+
+        # Insert into user_comment_blocks table
+        insert_block = f"""
+            INSERT INTO {self.keyspace}.user_comment_blocks
+            (user_id, block_id, blocked_at, blocked_by, reason, moderator_notes,
+             expires_at, is_permanent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        await self.session.execute_async(
+            insert_block,
+            (
+                block.user_id,
+                block.block_id,
+                block.blocked_at,
+                block.blocked_by,
+                block.reason,
+                block.moderator_notes,
+                block.expires_at,
+                block.is_permanent,
+            ),
+        )
+
+        # Insert into moderator activity log
+        insert_log = f"""
+            INSERT INTO {self.keyspace}.comment_blocks_by_moderator
+            (moderator_id, block_id, user_id, blocked_at, reason, is_permanent)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        await self.session.execute_async(
+            insert_log,
+            (
+                moderator_id,
+                block.block_id,
+                user_id,
+                block.blocked_at,
+                reason,
+                block.is_permanent,
+            ),
+        )
+
+        # Create audit log for compliance
+        audit_log = create_audit_log(
+            moderator_id=moderator_id,
+            action=ModeratorAction.BLOCK_USER,
+            target_user_id=user_id,
+            target_id=block.block_id,
+            details=f"Reason: {reason}, Duration: {'Permanent' if block.is_permanent else f'{duration_days} days'}",
+        )
+
+        # Insert audit log
+        insert_audit = f"""
+            INSERT INTO {self.keyspace}.moderator_audit_log
+            (log_id, moderator_id, action, target_user_id, target_id, performed_at, details, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        await self.session.execute_async(
+            insert_audit,
+            (
+                audit_log.log_id,
+                audit_log.moderator_id,
+                audit_log.action.value,
+                audit_log.target_user_id,
+                audit_log.target_id,
+                audit_log.performed_at,
+                audit_log.details,
+                audit_log.ip_address,
+                audit_log.user_agent,
+            ),
+        )
+
+        return UserBlockResponse.from_block(block)
+
+    async def unblock_user(
+        self,
+        user_id: UUID,
+        block_id: UUID,
+        moderator_id: UUID,
+        notes: str | None = None,
+    ) -> bool:
+        """Unblock a user by updating block expiration.
+
+        Args:
+            user_id: ID of user to unblock
+            block_id: ID of specific block to remove
+            moderator_id: ID of moderator removing the block
+            notes: Optional notes about the unblock
+
+        Returns:
+            True if block was found and updated, False otherwise
+        """
+        # Check if block exists
+        query = f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ? AND block_id = ?
+            LIMIT 1
+        """
+        result = await self.session.execute_async(query, (user_id, block_id))
+        row = result.one()
+
+        if not row:
+            return False
+
+        # Update block to expire now
+        update_block = f"""
+            UPDATE {self.keyspace}.user_comment_blocks
+            SET expires_at = ?
+            WHERE user_id = ? AND blocked_at = ? AND block_id = ?
+        """
+        now = datetime.now(UTC)
+        await self.session.execute_async(
+            update_block,
+            (now, user_id, row.blocked_at, block_id),
+        )
+
+        # Create audit log for compliance
+        audit_log = create_audit_log(
+            moderator_id=moderator_id,
+            action=ModeratorAction.UNBLOCK_USER,
+            target_user_id=user_id,
+            target_id=block_id,
+            details=notes or "Block removed manually",
+        )
+
+        # Insert audit log
+        insert_audit = f"""
+            INSERT INTO {self.keyspace}.moderator_audit_log
+            (log_id, moderator_id, action, target_user_id, target_id, performed_at, details, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        await self.session.execute_async(
+            insert_audit,
+            (
+                audit_log.log_id,
+                audit_log.moderator_id,
+                audit_log.action.value,
+                audit_log.target_user_id,
+                audit_log.target_id,
+                audit_log.performed_at,
+                audit_log.details,
+                audit_log.ip_address,
+                audit_log.user_agent,
+            ),
+        )
+
+        return True
+
+    async def is_user_blocked(self, user_id: UUID) -> bool:
+        """Check if user is currently blocked from commenting.
+
+        Args:
+            user_id: ID of user to check
+
+        Returns:
+            True if user has an active block, False otherwise
+        """
+        # Get most recent block for user
+        query = f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ?
+            ORDER BY blocked_at DESC
+            LIMIT 1
+        """
+        result = await self.session.execute_async(query, (user_id,))
+        row = result.one()
+
+        if not row:
+            return False
+
+        # Convert to UserCommentBlock entity
+        block = UserCommentBlock.from_row(row)
+
+        # Check if block is still active
+        return block.is_active()
+
+    async def get_user_blocks(
+        self,
+        user_id: UUID,
+        limit: int = 20,
+    ) -> "UserBlockListResponse":
+        """Get all blocks for a user.
+
+        Args:
+            user_id: ID of user
+            limit: Maximum number of blocks to return
+
+        Returns:
+            UserBlockListResponse with list of blocks
+        """
+        query = f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ?
+            ORDER BY blocked_at DESC
+            LIMIT ?
+        """
+        result = await self.session.execute_async(query, (user_id, limit + 1))
+        rows = result.all()
+
+        # Convert to entities
+        blocks = [UserCommentBlock.from_row(row) for row in rows[:limit]]
+
+        # Convert to responses
+        items = [UserBlockResponse.from_block(block) for block in blocks]
+
+        return UserBlockListResponse(
+            items=items,
+            total=len(rows),
+            has_more=len(rows) > limit,
+        )

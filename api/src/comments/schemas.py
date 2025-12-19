@@ -103,6 +103,35 @@ class ModerateReportRequest(BaseModel):
     notes: str | None = Field(None, max_length=1000)
 
 
+class BlockUserRequest(BaseModel):
+    """Request to block a user from commenting."""
+
+    reason: str = Field(..., min_length=1, max_length=500)
+    moderator_notes: str | None = Field(None, max_length=1000)
+    duration_days: int | None = Field(
+        None,
+        ge=1,
+        le=365,
+        description="Duration in days (None for permanent)",
+    )
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        """Strip whitespace and validate reason."""
+        v = v.strip()
+        if not v:
+            msg = "Reason cannot be empty"
+            raise ValueError(msg)
+        return v
+
+
+class UnblockUserRequest(BaseModel):
+    """Request to unblock a user."""
+
+    notes: str | None = Field(None, max_length=1000)
+
+
 # ==============================================================================
 # Response Schemas
 # ==============================================================================
@@ -290,6 +319,54 @@ class RatingStatsResponse(BaseModel):
     rating_distribution: dict[str, int] = Field(
         default_factory=lambda: {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
     )
+
+
+class UserBlockResponse(BaseModel):
+    """Response for a user comment block."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    blocked_at: datetime
+    blocked_by: UUID
+    blocked_by_name: str | None = None
+    reason: str
+    moderator_notes: str | None = None
+    expires_at: datetime | None = None
+    is_permanent: bool
+    is_active: bool
+
+    @classmethod
+    def from_block(
+        cls, block: Any, moderator_name: str | None = None
+    ) -> "UserBlockResponse":
+        """Create response from UserCommentBlock entity.
+
+        Args:
+            block: UserCommentBlock entity
+            moderator_name: Name of the moderator who created the block
+        """
+        return cls(
+            id=block.block_id,
+            user_id=block.user_id,
+            blocked_at=block.blocked_at,
+            blocked_by=block.blocked_by,
+            blocked_by_name=moderator_name,
+            reason=block.reason,
+            moderator_notes=block.moderator_notes,
+            expires_at=block.expires_at,
+            is_permanent=block.is_permanent,
+            is_active=block.is_active(),
+        )
+
+
+class UserBlockListResponse(BaseModel):
+    """Paginated list of user blocks."""
+
+    items: list[UserBlockResponse]
+    total: int
+    has_more: bool
 
 
 # ==============================================================================
