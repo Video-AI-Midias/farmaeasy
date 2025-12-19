@@ -207,6 +207,13 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Prepare Google Service Account Credentials
+        run: |
+          mkdir -p api/credentials
+          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" | base64 -d > api/credentials/google-service-account.json
+          chmod 600 api/credentials/google-service-account.json
+          echo "✅ Google Service Account credentials prepared"
+
       - name: Deploy API with Blue/Green
         env:
           IMAGE_TAG: ${{ needs.build-api.outputs.image_tag }}
@@ -233,6 +240,13 @@ jobs:
             --ignore-existing \
             api/.env.example \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/.env
+
+          # Sync Google Service Account credentials
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.REMOTE_DIR }}/api/credentials"
+          rsync -avz \
+            api/credentials/google-service-account.json \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/credentials/
+          echo "✅ Google Service Account credentials synced to server"
 
           # Execute blue/green deployment on remote server
           ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << EOF
