@@ -488,7 +488,7 @@ class VerificationService:
         # Send email
         try:
             await self.email_service.send_password_reset_code(
-                to_email=email,
+                to=email,
                 user_name=user.name or "Usuario",
                 code=plain_code,
             )
