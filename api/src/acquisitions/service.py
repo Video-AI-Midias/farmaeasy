@@ -299,10 +299,17 @@ class AcquisitionService:
         Raises:
             ValueError: If user already has active access
         """
-        # Check if already has active access
-        existing = await self.check_access(user_id, course_id)
-        if existing.has_access:
-            raise ValueError("User already has active access to this course")
+        # Check if already has active access by querying ALL acquisitions
+        # and checking if ANY is active (prevents race conditions)
+        rows = self.session.execute(
+            self._get_user_acquisitions,
+            [user_id],
+        )
+
+        for row in rows:
+            acquisition = CourseAcquisition.from_row(row)
+            if acquisition.course_id == course_id and acquisition.is_active():
+                raise ValueError("User already has active access to this course")
 
         # Calculate expiration
         expires_at = None
@@ -500,22 +507,36 @@ class AcquisitionService:
             limit: Maximum number of results
 
         Returns:
-            List of acquisitions
+            List of acquisitions (deduplicated, most recent per user)
         """
         rows = self.session.execute(
             self._get_course_acquisitions,
             [course_id, limit],
         )
 
-        # Need to fetch full acquisition data from main table
+        # Deduplicate by user_id - keep most recent acquisition per user
+        # acquisitions_by_course is ordered by (granted_at DESC, user_id ASC)
+        # so first occurrence is the most recent
+        seen_users: set[UUID] = set()
         acquisitions = []
+
         for row in rows:
+            # Skip if we already processed this user
+            if row.user_id in seen_users:
+                continue
+
+            # Fetch full acquisition data from main table
             full_row = self.session.execute(
                 self._get_user_course_acquisition,
                 [row.user_id, course_id],
             ).one()
+
             if full_row:
-                acquisitions.append(CourseAcquisition.from_row(full_row))
+                acquisition = CourseAcquisition.from_row(full_row)
+                # Only include active acquisitions
+                if acquisition.is_active():
+                    acquisitions.append(acquisition)
+                    seen_users.add(row.user_id)
 
         return acquisitions
 
