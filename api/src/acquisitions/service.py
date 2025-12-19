@@ -409,16 +409,21 @@ class AcquisitionService:
         Returns:
             True if access was revoked, False if no active access found
         """
-        row = self.session.execute(
-            self._get_user_course_acquisition,
-            [user_id, course_id],
-        ).one()
+        # Query ALL acquisitions to avoid non-deterministic LIMIT 1
+        rows = self.session.execute(
+            self._get_user_acquisitions,
+            [user_id],
+        )
 
-        if not row:
-            return False
+        # Find the active acquisition for this specific course
+        acquisition = None
+        for row in rows:
+            acq = CourseAcquisition.from_row(row)
+            if acq.course_id == course_id and acq.is_active():
+                acquisition = acq
+                break
 
-        acquisition = CourseAcquisition.from_row(row)
-        if not acquisition.is_active():
+        if not acquisition:
             return False
 
         # Update status to revoked
