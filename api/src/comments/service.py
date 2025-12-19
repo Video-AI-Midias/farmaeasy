@@ -754,7 +754,7 @@ class CommentService:
                         is_deleted=comment.is_deleted,
                         reply_count=actual_reply_count,
                         rating=comment.rating,
-                        is_review=comment.is_review,
+                        is_review=comment.is_review or False,
                         reactions=reactions,
                         user_reaction=user_reaction,
                         created_at=comment.created_at,
