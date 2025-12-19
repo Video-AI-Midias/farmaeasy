@@ -429,53 +429,44 @@
   .bg-farma-accent {
     background-color: oklch(60% 0.14 180);
   }
+}
 
-  /* Line clamp utilities for text truncation */
-  .line-clamp-1 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+/* ==========================================================================
+   LINE CLAMP FIX - Tailwind v4 built-in line-clamp não funciona corretamente
+   Aumentando especificidade com seletor [class*] para sobrescrever Tailwind
+   ========================================================================== */
+[class*="line-clamp-1"],
+[class*="line-clamp-2"],
+[class*="line-clamp-3"],
+[class*="line-clamp-4"],
+[class*="line-clamp-5"],
+[class*="line-clamp-6"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+[class*="line-clamp-1"] {
+  -webkit-line-clamp: 1;
+}
 
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+[class*="line-clamp-2"] {
+  -webkit-line-clamp: 2;
+}
 
-  .line-clamp-4 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+[class*="line-clamp-3"] {
+  -webkit-line-clamp: 3;
+}
 
-  .line-clamp-5 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+[class*="line-clamp-4"] {
+  -webkit-line-clamp: 4;
+}
 
-  .line-clamp-6 {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 6;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+[class*="line-clamp-5"] {
+  -webkit-line-clamp: 5;
+}
+
+[class*="line-clamp-6"] {
+  -webkit-line-clamp: 6;
 }
