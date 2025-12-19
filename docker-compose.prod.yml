@@ -104,6 +104,8 @@ services:
       # Cassandra connection (internal network)
       - CASSANDRA_HOSTS=["cassandra-prod"]
       - CASSANDRA_PORT=9042
+    volumes:
+      - ./api/credentials:/app/credentials:ro
     healthcheck:
       test:
         [
@@ -148,6 +150,8 @@ services:
       # Cassandra connection (internal network)
       - CASSANDRA_HOSTS=["cassandra-prod"]
       - CASSANDRA_PORT=9042
+    volumes:
+      - ./api/credentials:/app/credentials:ro
     healthcheck:
       test:
         [
