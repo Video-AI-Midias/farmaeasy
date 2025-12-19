@@ -107,11 +107,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Senha</Label>
-          <Link
-            to="/forgot-password"
-            className="text-sm text-primary hover:underline"
-            tabIndex={-1}
-          >
+          <Link to="/esqueci-senha" className="text-sm text-primary hover:underline" tabIndex={-1}>
             Esqueceu a senha?
           </Link>
         </div>
