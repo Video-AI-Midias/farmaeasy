@@ -249,7 +249,7 @@ function CourseSidebar({
             <ArrowLeft className="h-4 w-4" />
             Voltar ao curso
           </Link>
-          <h3 className="font-semibold mt-2 line-clamp-2">{course.title}</h3>
+          <h3 className="font-semibold mt-2 text-truncate-2">{course.title}</h3>
           {/* Course progress bar (calculated from actual lesson completion) */}
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">

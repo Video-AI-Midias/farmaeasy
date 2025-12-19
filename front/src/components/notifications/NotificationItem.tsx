@@ -125,7 +125,7 @@ export function NotificationItem({ notification, onClick }: NotificationItemProp
           {notification.title}
         </p>
         {notification.message && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
+          <p className="text-xs text-muted-foreground text-truncate-2">{notification.message}</p>
         )}
         <p className="text-xs text-muted-foreground">
           {formatRelativeTime(notification.created_at)}

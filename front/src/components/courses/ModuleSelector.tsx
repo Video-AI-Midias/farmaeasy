@@ -135,7 +135,7 @@ export function ModuleSelector({
                           </Badge>
                         </div>
                         {module.description && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          <p className="text-sm text-muted-foreground mt-1 text-truncate-2">
                             {module.description}
                           </p>
                         )}

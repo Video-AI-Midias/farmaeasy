@@ -205,7 +205,7 @@ export function LessonSelector({
                               </Badge>
                             </div>
                             {lesson.description && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                              <p className="text-sm text-muted-foreground mt-1 text-truncate-1">
                                 {lesson.description}
                               </p>
                             )}

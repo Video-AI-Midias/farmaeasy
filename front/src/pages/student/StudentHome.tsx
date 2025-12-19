@@ -137,7 +137,7 @@ function CourseEnrollmentCard({ enrollment, course }: CourseEnrollmentCardProps)
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="font-medium leading-tight line-clamp-1">{course.title}</h3>
+                <h3 className="font-medium leading-tight text-truncate-1">{course.title}</h3>
                 <p className="text-sm text-muted-foreground">
                   {enrollment.lessons_completed} de {enrollment.lessons_total} aulas
                 </p>
@@ -208,9 +208,9 @@ function AvailableCourseCard({ course, isEnrolled }: AvailableCourseCardProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium leading-tight line-clamp-1">{course.title}</h3>
+            <h3 className="font-medium leading-tight text-truncate-1">{course.title}</h3>
             {course.description && (
-              <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+              <p className="mt-1 text-sm text-muted-foreground text-truncate-2">
                 {course.description}
               </p>
             )}

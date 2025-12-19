@@ -107,7 +107,7 @@ export function ModuleCard({
               </Badge>
             </div>
             {module.description && (
-              <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
+              <p className="mt-1 text-sm text-muted-foreground text-truncate-1">
                 {module.description}
               </p>
             )}

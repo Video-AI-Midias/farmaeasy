@@ -300,7 +300,7 @@ function LessonsContent() {
                             <div>
                               <p className="font-medium">{lesson.title}</p>
                               {lesson.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-1">
+                                <p className="text-sm text-muted-foreground text-truncate-1">
                                   {lesson.description}
                                 </p>
                               )}

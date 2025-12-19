@@ -432,41 +432,41 @@
 }
 
 /* ==========================================================================
-   LINE CLAMP FIX - Tailwind v4 built-in line-clamp não funciona corretamente
-   Usando especificidade alta (0,2,0) repetindo seletor de classe
+   TEXT TRUNCATE - Classes customizadas que NÃO conflitam com Tailwind v4
+   Usa nomes diferentes (.text-truncate-*) para evitar sobrescrita
    ========================================================================== */
-.line-clamp-1.line-clamp-1,
-.line-clamp-2.line-clamp-2,
-.line-clamp-3.line-clamp-3,
-.line-clamp-4.line-clamp-4,
-.line-clamp-5.line-clamp-5,
-.line-clamp-6.line-clamp-6 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.text-truncate-1,
+.text-truncate-2,
+.text-truncate-3,
+.text-truncate-4,
+.text-truncate-5,
+.text-truncate-6 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
-.line-clamp-1.line-clamp-1 {
-  -webkit-line-clamp: 1;
+.text-truncate-1 {
+  -webkit-line-clamp: 1 !important;
 }
 
-.line-clamp-2.line-clamp-2 {
-  -webkit-line-clamp: 2;
+.text-truncate-2 {
+  -webkit-line-clamp: 2 !important;
 }
 
-.line-clamp-3.line-clamp-3 {
-  -webkit-line-clamp: 3;
+.text-truncate-3 {
+  -webkit-line-clamp: 3 !important;
 }
 
-.line-clamp-4.line-clamp-4 {
-  -webkit-line-clamp: 4;
+.text-truncate-4 {
+  -webkit-line-clamp: 4 !important;
 }
 
-.line-clamp-5.line-clamp-5 {
-  -webkit-line-clamp: 5;
+.text-truncate-5 {
+  -webkit-line-clamp: 5 !important;
 }
 
-.line-clamp-6.line-clamp-6 {
-  -webkit-line-clamp: 6;
+.text-truncate-6 {
+  -webkit-line-clamp: 6 !important;
 }

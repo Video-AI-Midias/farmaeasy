@@ -224,7 +224,7 @@ function CoursesContent() {
                         <div>
                           <p className="font-medium">{course.title}</p>
                           {course.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-1">
+                            <p className="text-sm text-muted-foreground text-truncate-1">
                               {course.description}
                             </p>
                           )}
