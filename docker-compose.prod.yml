@@ -106,6 +106,7 @@ services:
       - CASSANDRA_PORT=9042
     volumes:
       - ./api/credentials:/app/credentials:ro
+      - ./api/firebase-credentials.json:/app/firebase-credentials.json:ro
     healthcheck:
       test:
         [
@@ -152,6 +153,7 @@ services:
       - CASSANDRA_PORT=9042
     volumes:
       - ./api/credentials:/app/credentials:ro
+      - ./api/firebase-credentials.json:/app/firebase-credentials.json:ro
     healthcheck:
       test:
         [
