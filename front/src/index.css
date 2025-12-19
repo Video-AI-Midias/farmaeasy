@@ -434,6 +434,7 @@
 /* ==========================================================================
    TEXT TRUNCATE - Classes customizadas que NÃO conflitam com Tailwind v4
    Usa nomes diferentes (.text-truncate-*) para evitar sobrescrita
+   CRÍTICO: white-space normal para sobrescrever whitespace-nowrap do pai
    ========================================================================== */
 .text-truncate-1,
 .text-truncate-2,
@@ -445,6 +446,9 @@
   -webkit-box-orient: vertical !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
 }
 
 .text-truncate-1 {
