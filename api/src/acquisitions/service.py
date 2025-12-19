@@ -530,18 +530,30 @@ class AcquisitionService:
             if row.user_id in seen_users:
                 continue
 
-            # Fetch full acquisition data from main table
-            full_row = self.session.execute(
-                self._get_user_course_acquisition,
-                [row.user_id, course_id],
-            ).one()
+            # Fetch ALL acquisitions for this user to avoid non-deterministic LIMIT 1
+            user_rows = self.session.execute(
+                self._get_user_acquisitions,
+                [row.user_id],
+            )
 
-            if full_row:
-                acquisition = CourseAcquisition.from_row(full_row)
-                # Only include active acquisitions
-                if acquisition.is_active():
-                    acquisitions.append(acquisition)
-                    seen_users.add(row.user_id)
+            # Find the most recent active acquisition for this course
+            active_acquisition = None
+            for user_row in user_rows:
+                acq = CourseAcquisition.from_row(user_row)
+                # Keep the most recent active acquisition
+                if (
+                    acq.course_id == course_id
+                    and acq.is_active()
+                    and (
+                        active_acquisition is None
+                        or acq.granted_at > active_acquisition.granted_at
+                    )
+                ):
+                    active_acquisition = acq
+
+            if active_acquisition:
+                acquisitions.append(active_acquisition)
+                seen_users.add(row.user_id)
 
         return acquisitions
 
