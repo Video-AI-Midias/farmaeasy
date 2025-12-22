@@ -208,22 +208,24 @@ function CoursesContent() {
                 )}
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Titulo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Modulos</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="w-[40%] min-w-[200px] max-w-[400px]">Titulo</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[80px] text-center">Modulos</TableHead>
+                    <TableHead className="w-[120px]">Criado em</TableHead>
+                    <TableHead className="w-[120px] text-right">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {courses.map((course) => (
                     <TableRow key={course.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{course.title}</p>
+                      <TableCell className="max-w-[400px]">
+                        <div className="space-y-0.5 overflow-hidden">
+                          <TruncatedText lines={1} className="font-medium">
+                            {course.title}
+                          </TruncatedText>
                           {course.description && (
                             <TruncatedText lines={1} className="text-sm text-muted-foreground">
                               {course.description}
