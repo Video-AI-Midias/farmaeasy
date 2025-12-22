@@ -209,22 +209,24 @@ function ModulesContent() {
                 )}
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Titulo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Aulas</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="w-[40%] min-w-[200px] max-w-[400px]">Titulo</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[80px] text-center">Aulas</TableHead>
+                    <TableHead className="w-[120px]">Criado em</TableHead>
+                    <TableHead className="w-[120px] text-right">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {modules.map((module) => (
                     <TableRow key={module.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{module.title}</p>
+                      <TableCell className="max-w-[400px]">
+                        <div className="space-y-0.5 overflow-hidden">
+                          <TruncatedText lines={1} className="font-medium">
+                            {module.title}
+                          </TruncatedText>
                           {module.description && (
                             <TruncatedText lines={1} className="text-sm text-muted-foreground">
                               {module.description}

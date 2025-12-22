@@ -279,15 +279,15 @@ function LessonsContent() {
                 )}
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Titulo</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Duracao</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="w-[35%] min-w-[200px] max-w-[350px]">Titulo</TableHead>
+                    <TableHead className="w-[80px]">Tipo</TableHead>
+                    <TableHead className="w-[110px]">Status</TableHead>
+                    <TableHead className="w-[90px] text-center">Duracao</TableHead>
+                    <TableHead className="w-[100px]">Criado em</TableHead>
+                    <TableHead className="w-[100px] text-right">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -295,11 +295,13 @@ function LessonsContent() {
                     const Icon = contentTypeIcons[lesson.content_type];
                     return (
                       <TableRow key={lesson.id}>
-                        <TableCell>
-                          <div className="flex items-start gap-3">
+                        <TableCell className="max-w-[350px]">
+                          <div className="flex items-start gap-3 overflow-hidden">
                             <Icon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                            <div>
-                              <p className="font-medium">{lesson.title}</p>
+                            <div className="overflow-hidden min-w-0">
+                              <TruncatedText lines={1} className="font-medium">
+                                {lesson.title}
+                              </TruncatedText>
                               {lesson.description && (
                                 <TruncatedText lines={1} className="text-sm text-muted-foreground">
                                   {lesson.description}
