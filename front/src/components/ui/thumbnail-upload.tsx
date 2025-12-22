@@ -244,7 +244,7 @@ export function ThumbnailUpload({
   // Show preview if has value
   if (value) {
     return (
-      <div className={cn("space-y-2", className)}>
+      <div className={cn("space-y-2 w-full overflow-hidden", className)}>
         <div className="relative rounded-lg border overflow-hidden aspect-video max-w-[300px]">
           <img
             src={value}
@@ -267,7 +267,9 @@ export function ThumbnailUpload({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate max-w-[300px]">{value}</p>
+        <p className="text-xs text-muted-foreground truncate w-full max-w-full" title={value}>
+          {value}
+        </p>
       </div>
     );
   }

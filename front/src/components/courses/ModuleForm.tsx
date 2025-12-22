@@ -126,7 +126,7 @@ export function ModuleForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Modulo" : "Criar Modulo"}</DialogTitle>
           <DialogDescription>
@@ -137,7 +137,7 @@ export function ModuleForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 overflow-hidden">
             <FormField
               control={form.control}
               name="title"
@@ -161,7 +161,7 @@ export function ModuleForm({
                   <FormControl>
                     <Textarea
                       placeholder="Descreva o conteudo do modulo..."
-                      className="min-h-[100px]"
+                      className="min-h-[100px] max-h-[200px] resize-y"
                       {...field}
                       value={field.value || ""}
                     />
