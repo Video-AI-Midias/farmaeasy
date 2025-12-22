@@ -73,6 +73,51 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+// ==============================================================================
+// Helper Functions
+// ==============================================================================
+
+/**
+ * Converts plain text with URLs into JSX with clickable links.
+ * Detects URLs in text and wraps them in anchor tags.
+ */
+function renderTextWithLinks(text: string): React.ReactNode {
+  if (!text) return null;
+
+  // Regex to detect URLs (http, https, www)
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+  const matches = text.match(urlRegex);
+
+  if (!matches) {
+    return text;
+  }
+
+  let urlCounter = 0;
+  let textCounter = 0;
+
+  return parts.map((part) => {
+    // Check if this part is a URL
+    if (matches.includes(part)) {
+      const href = part.startsWith("http") ? part : `https://${part}`;
+      const key = `link-${urlCounter++}-${part.slice(0, 20)}`;
+      return (
+        <a
+          key={key}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline hover:text-primary/80"
+        >
+          {part}
+        </a>
+      );
+    }
+    const key = `text-${textCounter++}-${part.slice(0, 20)}`;
+    return <span key={key}>{part}</span>;
+  });
+}
+
 // Content type icons mapping
 const contentTypeIcons: Record<ContentType, typeof PlayCircle> = {
   [ContentType.VIDEO]: PlayCircle,
@@ -1181,7 +1226,9 @@ export function StudentLessonViewContent() {
                   <CardTitle className="text-lg">Sobre esta aula</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">{lesson.description}</p>
+                  <p className="text-muted-foreground whitespace-pre-wrap">
+                    {renderTextWithLinks(lesson.description)}
+                  </p>
                 </CardContent>
               </Card>
             )}
