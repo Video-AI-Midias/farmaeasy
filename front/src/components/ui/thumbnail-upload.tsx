@@ -335,7 +335,8 @@ export function ThumbnailUpload({
         {isUploading ? (
           <>
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Enviando...</p>
+            <p className="text-sm font-medium text-primary">Enviando imagem...</p>
+            <p className="text-xs text-muted-foreground">{uploadProgress}% concluído</p>
             <Progress value={uploadProgress} className="w-full max-w-[200px]" />
           </>
         ) : (
