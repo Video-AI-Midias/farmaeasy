@@ -35,7 +35,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 // ==============================================================================
 // Helper Functions
@@ -232,10 +232,15 @@ function AvailableCourseCard({ course, isEnrolled }: AvailableCourseCardProps) {
             <Badge variant="outline">Ja inscrito</Badge>
           ) : (
             <Button size="sm" variant="outline" asChild>
-              <Link to={`/aprender/${course.slug}`} className="gap-1">
-                Ver curso
+              <a
+                href="https://wa.link/6sldm4"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="gap-1"
+              >
+                Falar no WhatsApp
                 <ArrowRight className="h-3 w-3" />
-              </Link>
+              </a>
             </Button>
           )}
         </div>
