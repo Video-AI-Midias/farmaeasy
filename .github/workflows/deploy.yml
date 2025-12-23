@@ -230,7 +230,8 @@ jobs:
             blue-green-deploy.sh \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
 
-          # Sync nginx production config
+          # Sync nginx production config (create dir if needed)
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.REMOTE_DIR }}/docker/nginx"
           rsync -avz \
             docker/nginx/nginx-prod.conf \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/docker/nginx/
