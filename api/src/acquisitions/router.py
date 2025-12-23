@@ -4,7 +4,7 @@ Provides:
 - POST /v1/acquisitions/enroll/{course_id} - Self-enroll in free course
 - GET  /v1/acquisitions/my - List user's acquisitions
 - GET  /v1/acquisitions/check/{course_id} - Check access to course
-- Admin endpoints for granting/revoking access
+- Admin/Teacher endpoints for granting/revoking access
 """
 
 from typing import Annotated
@@ -16,9 +16,10 @@ from src.auth.dependencies import (
     CurrentUser,
     require_admin,
     require_student,
+    require_teacher,
 )
 from src.auth.models import User
-from src.courses.dependencies import CourseServiceDep
+from src.courses.dependencies import CourseServiceDep, is_owner_or_admin
 
 from .dependencies import AcquisitionServiceDep, AuthServiceDep
 from .schemas import (
@@ -137,15 +138,34 @@ async def check_course_access(
 async def grant_access(
     request: GrantAccessRequest,
     service: AcquisitionServiceDep,
+    course_service: CourseServiceDep,
     current_user: CurrentUser,
-    _: Annotated[User, Depends(require_admin)],
+    _: Annotated[User, Depends(require_teacher)],
 ) -> AcquisitionResponse:
-    """Grant access to a course for a specific user (admin only).
+    """Grant access to a course for a specific user.
+
+    Permissions:
+    - ADMIN: Can grant access to any course
+    - TEACHER: Can grant access only to own courses
 
     Can grant:
     - Permanent access (expires_in_days=None)
     - Temporary access (expires_in_days > 0)
     """
+    # Verify course exists and user has permission
+    course = course_service.get_course(request.course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Curso nao encontrado",
+        )
+
+    if not is_owner_or_admin(current_user, course.creator_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissao para conceder acesso a este curso",
+        )
+
     try:
         acquisition = await service.grant_access(
             user_id=request.user_id,
@@ -171,10 +191,30 @@ async def grant_access(
 async def batch_grant_access(
     request: BatchGrantAccessRequest,
     service: AcquisitionServiceDep,
+    course_service: CourseServiceDep,
     current_user: CurrentUser,
-    _: Annotated[User, Depends(require_admin)],
+    _: Annotated[User, Depends(require_teacher)],
 ) -> BatchGrantAccessResponse:
-    """Grant access to multiple users at once (admin only)."""
+    """Grant access to multiple users at once.
+
+    Permissions:
+    - ADMIN: Can grant access to any course
+    - TEACHER: Can grant access only to own courses
+    """
+    # Verify course exists and user has permission
+    course = course_service.get_course(request.course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Curso nao encontrado",
+        )
+
+    if not is_owner_or_admin(current_user, course.creator_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissao para conceder acesso a este curso",
+        )
+
     granted, skipped, errors = await service.batch_grant_access(
         user_ids=request.user_ids,
         course_id=request.course_id,
@@ -199,10 +239,31 @@ async def revoke_access(
     user_id: UUID,
     course_id: UUID,
     service: AcquisitionServiceDep,
-    _: Annotated[User, Depends(require_admin)],
+    course_service: CourseServiceDep,
+    current_user: CurrentUser,
+    _: Annotated[User, Depends(require_teacher)],
     request: RevokeAccessRequest | None = None,
 ) -> dict:
-    """Revoke a user's access to a course (admin only)."""
+    """Revoke a user's access to a course.
+
+    Permissions:
+    - ADMIN: Can revoke access from any course
+    - TEACHER: Can revoke access only from own courses
+    """
+    # Verify course exists and user has permission
+    course = course_service.get_course(course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Curso nao encontrado",
+        )
+
+    if not is_owner_or_admin(current_user, course.creator_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissao para revogar acesso deste curso",
+        )
+
     reason = request.reason if request else None
     revoked = await service.revoke_access(
         user_id=user_id,
@@ -227,15 +288,34 @@ async def revoke_access(
 async def list_course_students(
     course_id: UUID,
     service: AcquisitionServiceDep,
+    course_service: CourseServiceDep,
     auth_service: AuthServiceDep,
-    _: Annotated[User, Depends(require_admin)],
+    current_user: CurrentUser,
+    _: Annotated[User, Depends(require_teacher)],
     limit: int = 100,
 ) -> CourseStudentsListResponse:
-    """List all users with access to a specific course (admin only).
+    """List all users with access to a specific course.
+
+    Permissions:
+    - ADMIN: Can view students from any course
+    - TEACHER: Can view students only from own courses
 
     Returns full user information (name, email, avatar) along with
     acquisition details (type, status, dates).
     """
+    # Verify course exists and user has permission
+    course = course_service.get_course(course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Curso nao encontrado",
+        )
+
+    if not is_owner_or_admin(current_user, course.creator_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissao para visualizar alunos deste curso",
+        )
     acquisitions = await service.get_course_students(
         course_id=course_id,
         limit=limit,
@@ -304,8 +384,29 @@ async def list_user_acquisitions(
 async def count_course_students(
     course_id: UUID,
     service: AcquisitionServiceDep,
-    _: Annotated[User, Depends(require_admin)],
+    course_service: CourseServiceDep,
+    current_user: CurrentUser,
+    _: Annotated[User, Depends(require_teacher)],
 ) -> dict:
-    """Count users with access to a specific course (admin only)."""
+    """Count users with access to a specific course.
+
+    Permissions:
+    - ADMIN: Can count students from any course
+    - TEACHER: Can count students only from own courses
+    """
+    # Verify course exists and user has permission
+    course = course_service.get_course(course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Curso nao encontrado",
+        )
+
+    if not is_owner_or_admin(current_user, course.creator_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissao para visualizar dados deste curso",
+        )
+
     count = await service.count_course_students(course_id)
     return {"course_id": str(course_id), "student_count": count}
