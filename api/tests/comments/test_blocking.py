@@ -51,8 +51,8 @@ def comment_service(mock_session, mock_redis):
     )
     # Mock prepare to avoid actual statement preparation
     mock_session.prepare = Mock(return_value=Mock())
-    # Make aexecute awaitable by returning AsyncMock (cassandra-asyncio-driver)
-    mock_session.aexecute = AsyncMock(return_value=Mock())
+    # Make aexecute awaitable by returning list (cassandra-asyncio-driver returns list)
+    mock_session.aexecute = AsyncMock(return_value=[])
     return service
 
 
@@ -92,9 +92,8 @@ class TestBlockUser:
     ):
         """Should create a block record in database."""
         # Arrange - mock no existing block for security check
-        mock_result_no_block = Mock()
-        mock_result_no_block.one.return_value = None
-        mock_session.aexecute.return_value = mock_result_no_block
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []  # Empty list = no block
 
         # Act
         result = await comment_service.block_user(
@@ -127,9 +126,8 @@ class TestBlockUser:
     ):
         """Should create permanent block when duration_days is None."""
         # Arrange - mock no existing block
-        mock_result_no_block = Mock()
-        mock_result_no_block.one.return_value = None
-        mock_session.aexecute.return_value = mock_result_no_block
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []  # Empty list = no block
 
         # Act
         result = await comment_service.block_user(
@@ -153,9 +151,8 @@ class TestBlockUser:
     ):
         """Should create log entry in moderator activity table."""
         # Arrange - mock no existing block
-        mock_result_no_block = Mock()
-        mock_result_no_block.one.return_value = None
-        mock_session.aexecute.return_value = mock_result_no_block
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []  # Empty list = no block
 
         # Act
         await comment_service.block_user(
@@ -191,10 +188,9 @@ class TestUnblockUser:
         )
         mock_block.block_id = block_id
 
-        # Mock query to return the block
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # Mock query to return the block (list with one element)
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act
         result = await comment_service.unblock_user(
@@ -217,10 +213,9 @@ class TestUnblockUser:
         user_id: UUID,
     ):
         """Should return False if block doesn't exist."""
-        # Arrange - mock no block found
-        mock_result = Mock()
-        mock_result.one.return_value = None
-        mock_session.aexecute.return_value = mock_result
+        # Arrange - mock no block found (empty list)
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []
 
         # Act
         result = await comment_service.unblock_user(
@@ -256,9 +251,8 @@ class TestIsUserBlocked:
             expires_at=future_expires,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act
         is_blocked = await comment_service.is_user_blocked(user_id)
@@ -286,9 +280,8 @@ class TestIsUserBlocked:
             expires_at=past_expires,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act
         is_blocked = await comment_service.is_user_blocked(user_id)
@@ -315,9 +308,8 @@ class TestIsUserBlocked:
             expires_at=None,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act
         is_blocked = await comment_service.is_user_blocked(user_id)
@@ -333,10 +325,9 @@ class TestIsUserBlocked:
         user_id: UUID,
     ):
         """Should return False if user has no blocks."""
-        # Arrange - mock no blocks found
-        mock_result = Mock()
-        mock_result.one.return_value = None
-        mock_session.aexecute.return_value = mock_result
+        # Arrange - mock no blocks found (empty list)
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []
 
         # Act
         is_blocked = await comment_service.is_user_blocked(user_id)
@@ -370,9 +361,8 @@ class TestGetUserBlocks:
             for i in range(3)
         ]
 
-        mock_result = Mock()
-        mock_result.all.return_value = blocks
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = blocks
 
         # Act
         result = await comment_service.get_user_blocks(user_id, limit=10)
@@ -404,9 +394,9 @@ class TestGetUserBlocks:
             for i in range(10)
         ]
 
-        mock_result = Mock()
-        mock_result.all.return_value = blocks[:6]  # Return 6 to trigger has_more
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        # Return 6 to trigger has_more
+        mock_session.aexecute.return_value = blocks[:6]
 
         # Act
         result = await comment_service.get_user_blocks(user_id, limit=5)
@@ -462,9 +452,8 @@ class TestBlockingSecurityValidations:
             expires_at=future_expires,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -486,10 +475,9 @@ class TestBlockingSecurityValidations:
         moderator_id: UUID,
     ):
         """Should sanitize reason and notes to prevent XSS."""
-        # Arrange - mock no existing block
-        mock_result_no_block = Mock()
-        mock_result_no_block.one.return_value = None
-        mock_session.aexecute.return_value = mock_result_no_block
+        # Arrange - mock no existing block (empty list)
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = []
 
         # Act
         result = await comment_service.block_user(
@@ -531,9 +519,8 @@ class TestBlockingIntegration:
             expires_at=future_expires,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -568,20 +555,15 @@ class TestBlockingIntegration:
             expires_at=past_expires,
         )
 
-        # Mock for is_user_blocked check (returns expired block)
-        mock_result_block = Mock()
-        mock_result_block.one.return_value = mock_block
-
         # Mock for comment creation (returns new comment)
         mock_comment = Mock()
         mock_comment.comment_id = uuid4()
-        mock_result_comment = Mock()
-        mock_result_comment.one.return_value = mock_comment
 
         # Setup multiple execute_async calls
+        # cassandra-asyncio-driver aexecute returns list directly
         mock_session.aexecute.side_effect = [
-            mock_result_block,  # First call: check block
-            mock_result_comment,  # Second call: create comment
+            [mock_block],  # First call: check block (expired)
+            [mock_comment],  # Second call: create comment
         ]
 
         # Act - should not raise exception
@@ -604,20 +586,15 @@ class TestBlockingIntegration:
         user_id: UUID,
     ):
         """Should allow comment creation if user has no blocks."""
-        # Arrange - mock no blocks
-        mock_result_no_block = Mock()
-        mock_result_no_block.one.return_value = None
-
         # Mock for comment creation
         mock_comment = Mock()
         mock_comment.comment_id = uuid4()
-        mock_result_comment = Mock()
-        mock_result_comment.one.return_value = mock_comment
 
         # Setup multiple execute_async calls
+        # cassandra-asyncio-driver aexecute returns list directly
         mock_session.aexecute.side_effect = [
-            mock_result_no_block,  # First call: check block
-            mock_result_comment,  # Second call: create comment
+            [],  # First call: check block (no blocks)
+            [mock_comment],  # Second call: create comment
         ]
 
         # Act - should not raise exception
@@ -653,9 +630,8 @@ class TestBlockingIntegration:
             expires_at=None,
         )
 
-        mock_result = Mock()
-        mock_result.one.return_value = mock_block
-        mock_session.aexecute.return_value = mock_result
+        # cassandra-asyncio-driver aexecute returns list directly
+        mock_session.aexecute.return_value = [mock_block]
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

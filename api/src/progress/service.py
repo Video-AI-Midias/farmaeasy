@@ -241,7 +241,7 @@ class ProgressService:
     async def get_enrollment(self, user_id: UUID, course_id: UUID) -> Enrollment | None:
         """Get enrollment by user and course."""
         result = await self.session.aexecute(self._get_enrollment, [course_id, user_id])
-        row = result.one()
+        row = result[0] if result else None
         return Enrollment.from_row(row) if row else None
 
     async def get_user_enrollments(self, user_id: UUID) -> list[Enrollment]:
@@ -430,7 +430,7 @@ class ProgressService:
             self._get_lesson_progress,
             [user_id, course_id, module_id, lesson_id],
         )
-        row = result.one()
+        row = result[0] if result else None
         return LessonProgress.from_row(row) if row else None
 
     async def get_lesson_progress_check(
@@ -819,7 +819,7 @@ class ProgressService:
             self._get_module_progress,
             [user_id, course_id, module_id],
         )
-        row = result.one()
+        row = result[0] if result else None
         return (
             ModuleProgressResponse.from_entity(ModuleProgress.from_row(row))
             if row

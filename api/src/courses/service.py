@@ -204,13 +204,13 @@ class LessonService:
     async def get_lesson(self, lesson_id: UUID) -> Lesson | None:
         """Get lesson by ID."""
         rows = await self.session.aexecute(self._get_lesson_by_id, [lesson_id])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Lesson.from_row(row) if row else None
 
     async def get_lesson_by_slug(self, slug: str) -> Lesson | None:
         """Get lesson by slug."""
         rows = await self.session.aexecute(self._get_lesson_by_slug, [slug])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Lesson.from_row(row) if row else None
 
     async def update_lesson(self, lesson_id: UUID, data: UpdateLessonRequest) -> Lesson:
@@ -356,7 +356,7 @@ class LessonService:
             # Need to get module details from modules table
             cql = f"SELECT * FROM {self.keyspace}.modules WHERE id = ?"
             mod_rows = await self.session.aexecute(cql, [mid])
-            mod_row = mod_rows.one()
+            mod_row = mod_rows[0] if mod_rows else None
             if mod_row:
                 modules.append(Module.from_row(mod_row))
 
@@ -504,13 +504,13 @@ class ModuleService:
     async def get_module(self, module_id: UUID) -> Module | None:
         """Get module by ID."""
         rows = await self.session.aexecute(self._get_module_by_id, [module_id])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Module.from_row(row) if row else None
 
     async def get_module_by_slug(self, slug: str) -> Module | None:
         """Get module by slug."""
         rows = await self.session.aexecute(self._get_module_by_slug, [slug])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Module.from_row(row) if row else None
 
     async def update_module(self, module_id: UUID, data: UpdateModuleRequest) -> Module:
@@ -648,7 +648,7 @@ class ModuleService:
         rows = await self.session.aexecute(
             self._get_lesson_in_module, [module_id, lesson_id]
         )
-        if rows.one():
+        if rows:
             raise AlreadyLinkedError("Aula ja vinculada a este modulo")
 
         # Auto-calculate position if not provided
@@ -687,7 +687,7 @@ class ModuleService:
         rows = await self.session.aexecute(
             self._get_lesson_in_module, [module_id, lesson_id]
         )
-        row = rows.one()
+        row = rows[0] if rows else None
         if not row:
             raise NotLinkedError("Aula nao vinculada a este modulo")
 
@@ -715,7 +715,7 @@ class ModuleService:
             lesson_rows = await self.session.aexecute(
                 self._get_lesson_by_id, [link.lesson_id]
             )
-            lesson_row = lesson_rows.one()
+            lesson_row = lesson_rows[0] if lesson_rows else None
             if lesson_row:
                 lesson = Lesson.from_row(lesson_row)
                 results.append((lesson, link.position))
@@ -761,7 +761,7 @@ class ModuleService:
         for cid in course_ids:
             cql = f"SELECT * FROM {self.keyspace}.courses WHERE id = ?"
             course_rows = await self.session.aexecute(cql, [cid])
-            course_row = course_rows.one()
+            course_row = course_rows[0] if course_rows else None
             if course_row:
                 courses.append(Course.from_row(course_row))
 
@@ -963,13 +963,13 @@ class CourseService:
     async def get_course(self, course_id: UUID) -> Course | None:
         """Get course by ID."""
         rows = await self.session.aexecute(self._get_course_by_id, [course_id])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Course.from_row(row) if row else None
 
     async def get_course_by_slug(self, slug: str) -> Course | None:
         """Get course by slug."""
         rows = await self.session.aexecute(self._get_course_by_slug, [slug])
-        row = rows.one()
+        row = rows[0] if rows else None
         return Course.from_row(row) if row else None
 
     async def update_course(self, course_id: UUID, data: UpdateCourseRequest) -> Course:
@@ -1114,14 +1114,14 @@ class CourseService:
 
         # Verify module exists
         module_rows = await self.session.aexecute(self._get_module_by_id, [module_id])
-        if not module_rows.one():
+        if not module_rows:
             raise ModuleNotFoundError
 
         # Check if already linked
         rows = await self.session.aexecute(
             self._get_module_in_course, [course_id, module_id]
         )
-        if rows.one():
+        if rows:
             raise AlreadyLinkedError("Modulo ja vinculado a este curso")
 
         # Auto-calculate position if not provided
@@ -1160,7 +1160,7 @@ class CourseService:
         rows = await self.session.aexecute(
             self._get_module_in_course, [course_id, module_id]
         )
-        row = rows.one()
+        row = rows[0] if rows else None
         if not row:
             raise NotLinkedError("Modulo nao vinculado a este curso")
 
@@ -1188,7 +1188,7 @@ class CourseService:
             module_rows = await self.session.aexecute(
                 self._get_module_by_id, [link.module_id]
             )
-            module_row = module_rows.one()
+            module_row = module_rows[0] if module_rows else None
             if module_row:
                 module = Module.from_row(module_row)
                 results.append((module, link.position))

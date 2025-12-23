@@ -217,19 +217,19 @@ class AuthService:
     async def get_user_by_email(self, email: str) -> User | None:
         """Find user by email address."""
         result = await self.session.aexecute(self._get_user_by_email, [email.lower()])
-        row = result.one()
+        row = result[0] if result else None
         return User.from_row(row) if row else None
 
     async def get_user_by_cpf(self, cpf: str) -> User | None:
         """Find user by CPF."""
         result = await self.session.aexecute(self._get_user_by_cpf, [cpf])
-        row = result.one()
+        row = result[0] if result else None
         return User.from_row(row) if row else None
 
     async def get_user_by_id(self, user_id: UUID) -> User | None:
         """Find user by ID."""
         result = await self.session.aexecute(self._get_user_by_id, [user_id])
-        row = result.one()
+        row = result[0] if result else None
         return User.from_row(row) if row else None
 
     async def get_user_by_name(self, name: str) -> User | None:
@@ -239,7 +239,7 @@ class AuthService:
         Returns the first matching user if multiple exist with same name.
         """
         result = await self.session.aexecute(self._get_user_by_name, [name])
-        row = result.one()
+        row = result[0] if result else None
         return User.from_row(row) if row else None
 
     async def register_user(self, data: RegisterRequest) -> User:
@@ -806,7 +806,7 @@ class AuthService:
 
         # Check token in database
         result = await self.session.aexecute(self._get_token_by_jti, [jti])
-        row = result.one()
+        row = result[0] if result else None
         if not row:
             raise InvalidTokenError
 
@@ -879,7 +879,7 @@ class AuthService:
     async def get_token_by_jti(self, jti: UUID) -> RefreshToken | None:
         """Get refresh token by JTI."""
         result = await self.session.aexecute(self._get_token_by_jti, [jti])
-        row = result.one()
+        row = result[0] if result else None
         return RefreshToken.from_row(row) if row else None
 
     # ==========================================================================

@@ -612,7 +612,7 @@ class CommentService:
             self._count_replies,
             [lesson_id, comment_id],
         )
-        row = result.one()
+        row = result[0] if result else None
         return row.count if row else 0
 
     async def count_comments_by_author(self, author_id: UUID) -> int:
@@ -631,7 +631,7 @@ class CommentService:
             self._count_comments_by_author,
             [author_id],
         )
-        row = result.one()
+        row = result[0] if result else None
         return row.count if row else 0
 
     async def find_comment_by_id(
@@ -738,7 +738,7 @@ class CommentService:
             self._count_comments_by_lesson,
             [lesson_id],
         )
-        count_row = result.one()
+        count_row = result[0] if result else None
         total = count_row.count if count_row else 0
 
         response = CommentListResponse(
@@ -828,7 +828,7 @@ class CommentService:
             self._get_comment,
             [lesson_id, created_at, comment_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         if not row:
             raise CommentNotFoundError
@@ -910,7 +910,7 @@ class CommentService:
             self._get_comment,
             [lesson_id, created_at, comment_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         if not row:
             raise CommentNotFoundError
@@ -1033,7 +1033,7 @@ class CommentService:
             self._get_user_reaction,
             [user_id, comment_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         return row.reaction_type if row else None
 
@@ -1434,7 +1434,7 @@ class CommentService:
         """
         # Check if block exists using prepared statement (async)
         result = await self.session.aexecute(self._get_user_block, [user_id, block_id])
-        row = result.one()
+        row = result[0] if result else None
 
         if not row:
             return False
@@ -1489,7 +1489,7 @@ class CommentService:
         """
         # Get most recent block for user using prepared statement (async)
         result = await self.session.aexecute(self._check_user_blocked, [user_id])
-        row = result.one()
+        row = result[0] if result else None
 
         if not row:
             return False
@@ -1518,7 +1518,7 @@ class CommentService:
         result = await self.session.aexecute(
             self._get_user_blocks, [user_id, limit + 1]
         )
-        rows = result.all()
+        rows = result  # aexecute() returns list directly
 
         # Convert to entities
         blocks = [UserCommentBlock.from_row(row) for row in rows[:limit]]

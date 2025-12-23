@@ -162,7 +162,7 @@ class AcquisitionService:
             self._get_user_course_acquisition,
             [user_id, course_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         has_access = False
         if row:
@@ -225,7 +225,7 @@ class AcquisitionService:
             self._get_user_course_acquisition,
             [user_id, course_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         if not row:
             return CheckAccessResponse(has_access=False, can_enroll=True)
@@ -572,7 +572,7 @@ class AcquisitionService:
             self._count_course_acquisitions,
             [course_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         return row.count if row else 0
 

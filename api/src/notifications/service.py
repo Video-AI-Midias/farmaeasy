@@ -421,7 +421,7 @@ class NotificationService:
             self._get_unread_count,
             [user_id],
         )
-        row = result.one()
+        row = result[0] if result else None
 
         count = row.count if row and row.count else 0
 

@@ -332,7 +332,7 @@ class VerificationService:
 
         for key in keys_to_check:
             result = await self.session.aexecute(self._get_rate_limit, [key])
-            row = result.one()
+            row = result[0] if result else None
 
             if row:
                 # Check if blocked
@@ -381,7 +381,7 @@ class VerificationService:
 
         for key in keys:
             result = await self.session.aexecute(self._get_rate_limit, [key])
-            row = result.one()
+            row = result[0] if result else None
 
             if row:
                 new_count = row.request_count + 1
@@ -399,7 +399,7 @@ class VerificationService:
     ) -> int:
         """Record a failed verification attempt."""
         result = await self.session.aexecute(self._get_code_by_id, [code_id])
-        row = result.one()
+        row = result[0] if result else None
 
         if row:
             new_attempts = row.attempts + 1
