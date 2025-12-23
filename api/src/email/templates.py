@@ -15,6 +15,7 @@ HTML templates following FarmaEasy visual identity:
 
 from datetime import datetime
 
+
 # FarmaEasy logo URL (served from frontend public folder)
 # 200px width, 8.2KB, optimized for email clients
 LOGO_URL = "https://farmaeasy.com.br/logo-email.png"
