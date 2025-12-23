@@ -390,6 +390,9 @@ jobs:
       url: https://treinamento.farmaeasy.com.br
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
@@ -413,6 +416,39 @@ jobs:
           # Sync built files to server
           rsync -avz --delete \
             dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/var/www/html/treinamento.farmaeasy.com.br/
+
+          # Update nginx config for treinamento (with backup and validation)
+          NGINX_SRC="docker/nginx/treinamento-prod.conf"
+          NGINX_DEST="/etc/nginx/sites-available/treinamento.farmaeasy.com.br"
+          if [ -f "$NGINX_SRC" ]; then
+            # First sync the config file to server
+            rsync -avz "$NGINX_SRC" ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/treinamento-prod.conf
+
+            # Then apply if changed
+            ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'NGINX_EOF'
+              set -e
+              NGINX_DEST="/etc/nginx/sites-available/treinamento.farmaeasy.com.br"
+              if ! diff -q /tmp/treinamento-prod.conf "$NGINX_DEST" > /dev/null 2>&1; then
+                echo "Updating treinamento nginx configuration..."
+                sudo cp "$NGINX_DEST" "$NGINX_DEST.bak.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+                sudo cp /tmp/treinamento-prod.conf "$NGINX_DEST"
+                if sudo nginx -t; then
+                  sudo nginx -s reload
+                  echo "Nginx configuration updated successfully"
+                else
+                  echo "Nginx config invalid, restoring backup..."
+                  LATEST_BACKUP=$(ls -t "$NGINX_DEST.bak."* 2>/dev/null | head -1)
+                  if [ -n "$LATEST_BACKUP" ]; then
+                    sudo cp "$LATEST_BACKUP" "$NGINX_DEST"
+                  fi
+                  sudo nginx -s reload
+                fi
+              else
+                echo "Nginx configuration unchanged, skipping update"
+              fi
+              rm -f /tmp/treinamento-prod.conf
+          NGINX_EOF
+          fi
 
           echo "Frontend deployment completed!"
 
