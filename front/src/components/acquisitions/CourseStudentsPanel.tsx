@@ -25,7 +25,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { GrantAccessDialog } from "./GrantAccessDialog";
 
@@ -113,6 +113,9 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
 
+  // Ref to track previous students for comparison (avoids dependency in useCallback)
+  const studentsRef = useRef<CourseStudentResponse[]>([]);
+
   const fetchStudents = useCallback(
     async (showRefreshingState = false) => {
       if (showRefreshingState) {
@@ -124,11 +127,15 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
 
       try {
         const result = await acquisitionsAdminApi.getCourseStudents(courseId);
+        const previousStudents = studentsRef.current;
+
+        // Update ref and state
+        studentsRef.current = result.items;
         setStudents(result.items);
 
-        if (showRefreshingState && result.items.length > students.length) {
+        if (showRefreshingState && result.items.length > previousStudents.length) {
           // Highlight newly added students
-          const existingIds = new Set(students.map((s) => s.user_id));
+          const existingIds = new Set(previousStudents.map((s) => s.user_id));
           const newIds = new Set(
             result.items.filter((s) => !existingIds.has(s.user_id)).map((s) => s.user_id),
           );
@@ -148,7 +155,7 @@ export function CourseStudentsPanel({ courseId, courseTitle }: CourseStudentsPan
         setIsRefreshing(false);
       }
     },
-    [courseId, students],
+    [courseId],
   );
 
   useEffect(() => {
