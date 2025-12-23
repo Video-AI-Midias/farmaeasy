@@ -165,7 +165,7 @@ async def verify_course_view_access(
     user: CurrentUser,
 ):
     """Verify user can view a course."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -187,7 +187,7 @@ async def verify_course_edit_access(
     user: TeacherUser,
 ):
     """Verify user can edit a course (TEACHER or ADMIN required)."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -214,7 +214,7 @@ async def verify_module_view_access(
     user: CurrentUser,
 ):
     """Verify user can view a module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -236,7 +236,7 @@ async def verify_module_edit_access(
     user: TeacherUser,
 ):
     """Verify user can edit a module (TEACHER or ADMIN required)."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -263,7 +263,7 @@ async def verify_lesson_view_access(
     user: CurrentUser,
 ):
     """Verify user can view a lesson."""
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -285,7 +285,7 @@ async def verify_lesson_edit_access(
     user: TeacherUser,
 ):
     """Verify user can edit a lesson (TEACHER or ADMIN required)."""
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

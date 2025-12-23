@@ -171,6 +171,8 @@ class VerificationService:
     BLOCK_DURATION_MINUTES = 15
     MIN_LOCAL_EMAIL_LENGTH = 2
 
+    _initialized: bool = False
+
     def __init__(
         self,
         session: "Session",
@@ -183,19 +185,23 @@ class VerificationService:
         self.keyspace = keyspace
         self.email_service = email_service
         self.auth_service = auth_service
-
-        self._ensure_tables()
         self._prepare_statements()
 
-    def _ensure_tables(self) -> None:
-        """Create tables if they don't exist."""
+    async def initialize(self) -> None:
+        """Initialize tables (async). Call once after construction."""
+        if not self._initialized:
+            await self._ensure_tables()
+            self._initialized = True
+
+    async def _ensure_tables(self) -> None:
+        """Create tables if they don't exist (async)."""
         tables = [
             CREATE_VERIFICATION_CODES_TABLE,
             CREATE_VERIFICATION_CODES_BY_EMAIL_TABLE,
             CREATE_RATE_LIMITS_TABLE,
         ]
         for table_cql in tables:
-            self.session.execute(table_cql.format(keyspace=self.keyspace))
+            await self.session.aexecute(table_cql.format(keyspace=self.keyspace))
 
     def _prepare_statements(self) -> None:
         """Prepare CQL statements for better performance."""
@@ -325,7 +331,7 @@ class VerificationService:
         now = datetime.now(UTC)
 
         for key in keys_to_check:
-            result = self.session.execute(self._get_rate_limit, [key])
+            result = await self.session.aexecute(self._get_rate_limit, [key])
             row = result.one()
 
             if row:
@@ -347,7 +353,7 @@ class VerificationService:
                 # Check request count
                 if row.request_count >= self.MAX_REQUESTS_PER_HOUR:
                     blocked_until = now + timedelta(minutes=self.BLOCK_DURATION_MINUTES)
-                    self.session.execute(
+                    await self.session.aexecute(
                         self._upsert_rate_limit,
                         [
                             key,
@@ -374,29 +380,31 @@ class VerificationService:
         now = datetime.now(UTC)
 
         for key in keys:
-            result = self.session.execute(self._get_rate_limit, [key])
+            result = await self.session.aexecute(self._get_rate_limit, [key])
             row = result.one()
 
             if row:
                 new_count = row.request_count + 1
-                self.session.execute(
+                await self.session.aexecute(
                     self._upsert_rate_limit,
                     [key, new_count, row.failed_attempts, row.blocked_until, now],
                 )
             else:
-                self.session.execute(self._upsert_rate_limit, [key, 1, 0, None, now])
+                await self.session.aexecute(
+                    self._upsert_rate_limit, [key, 1, 0, None, now]
+                )
 
     async def _record_failed_attempt(
         self, code_id: UUID, email: str, code_type: CodeType
     ) -> int:
         """Record a failed verification attempt."""
-        result = self.session.execute(self._get_code_by_id, [code_id])
+        result = await self.session.aexecute(self._get_code_by_id, [code_id])
         row = result.one()
 
         if row:
             new_attempts = row.attempts + 1
-            self.session.execute(self._update_attempts, [new_attempts, code_id])
-            self.session.execute(
+            await self.session.aexecute(self._update_attempts, [new_attempts, code_id])
+            await self.session.aexecute(
                 self._update_attempts_by_email,
                 [new_attempts, email, code_type.value, code_id],
             )
@@ -431,7 +439,7 @@ class VerificationService:
         await self._increment_rate_limit(email, ip)
 
         # Check if user exists (but don't reveal this to caller)
-        user = self.auth_service.get_user_by_email(email)
+        user = await self.auth_service.get_user_by_email(email)
         if not user:
             logger.info(
                 "password_reset_email_not_found",
@@ -449,7 +457,7 @@ class VerificationService:
         expires_at = now + timedelta(minutes=self.CODE_EXPIRE_MINUTES)
 
         # Store code
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_code,
             [
                 code_id,
@@ -467,7 +475,7 @@ class VerificationService:
             ],
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_code_by_email,
             [
                 email,
@@ -508,7 +516,7 @@ class VerificationService:
 
     async def verify_reset_code(self, email: str, code: str) -> bool:
         """Verify a password reset code without using it."""
-        result = self.session.execute(
+        result = await self.session.aexecute(
             self._get_codes_by_email, [email, CodeType.PASSWORD_RESET.value]
         )
         rows = list(result)
@@ -543,7 +551,7 @@ class VerificationService:
 
     async def reset_password(self, email: str, code: str, new_password: str) -> bool:
         """Reset password using verification code."""
-        result = self.session.execute(
+        result = await self.session.aexecute(
             self._get_codes_by_email, [email, CodeType.PASSWORD_RESET.value]
         )
         rows = list(result)
@@ -566,15 +574,15 @@ class VerificationService:
                 )
 
             if self._verify_code_hash(code, row.code_hash):
-                user = self.auth_service.get_user_by_email(email)
+                user = await self.auth_service.get_user_by_email(email)
                 if not user:
                     raise InvalidCodeError("User not found.")
 
-                self.auth_service.reset_password(user.id, new_password)
+                await self.auth_service.reset_password(user.id, new_password)
 
                 # Mark code as used
-                self.session.execute(self._mark_code_used, [row.id])
-                self.session.execute(
+                await self.session.aexecute(self._mark_code_used, [row.id])
+                await self.session.aexecute(
                     self._mark_code_used_by_email,
                     [email, CodeType.PASSWORD_RESET.value, row.id],
                 )
@@ -615,7 +623,7 @@ class VerificationService:
         user_agent: str | None = None,
     ) -> bool:
         """Request an email change."""
-        user = self.auth_service.get_user_by_id(user_id)
+        user = await self.auth_service.get_user_by_id(user_id)
         if not user:
             raise VerificationError("User not found.")
 
@@ -628,7 +636,7 @@ class VerificationService:
             raise VerificationError("Invalid password.")
 
         # Check if new email is available
-        existing_user = self.auth_service.get_user_by_email(new_email)
+        existing_user = await self.auth_service.get_user_by_email(new_email)
         if existing_user:
             raise EmailNotAvailableError("This email is already in use.")
 
@@ -646,7 +654,7 @@ class VerificationService:
         expires_at = now + timedelta(minutes=self.CODE_EXPIRE_MINUTES)
 
         # Store code
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_code,
             [
                 code_id,
@@ -664,7 +672,7 @@ class VerificationService:
             ],
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_code_by_email,
             [
                 user.email,
@@ -706,11 +714,11 @@ class VerificationService:
 
     async def confirm_email_change(self, user_id: UUID, code: str) -> str:
         """Confirm email change with verification code."""
-        user = self.auth_service.get_user_by_id(user_id)
+        user = await self.auth_service.get_user_by_id(user_id)
         if not user:
             raise VerificationError("User not found.")
 
-        result = self.session.execute(
+        result = await self.session.aexecute(
             self._get_codes_by_email, [user.email, CodeType.EMAIL_CHANGE.value]
         )
         rows = list(result)
@@ -739,15 +747,15 @@ class VerificationService:
                 new_email = row.new_email
 
                 # Check again if new email is still available
-                if self.auth_service.get_user_by_email(new_email):
+                if await self.auth_service.get_user_by_email(new_email):
                     raise EmailNotAvailableError("This email is no longer available.")
 
                 # Update email
-                self.auth_service.update_user_email(user_id, new_email)
+                await self.auth_service.update_user_email(user_id, new_email)
 
                 # Mark code as used
-                self.session.execute(self._mark_code_used, [row.id])
-                self.session.execute(
+                await self.session.aexecute(self._mark_code_used, [row.id])
+                await self.session.aexecute(
                     self._mark_code_used_by_email,
                     [user.email, CodeType.EMAIL_CHANGE.value, row.id],
                 )
@@ -784,14 +792,14 @@ class VerificationService:
 
     async def _invalidate_existing_codes(self, email: str, code_type: CodeType) -> None:
         """Invalidate all existing codes for email and type."""
-        result = self.session.execute(
+        result = await self.session.aexecute(
             self._get_codes_by_email, [email, code_type.value]
         )
 
         for row in result:
             if not row.is_used:
-                self.session.execute(self._mark_code_used, [row.id])
-                self.session.execute(
+                await self.session.aexecute(self._mark_code_used, [row.id])
+                await self.session.aexecute(
                     self._mark_code_used_by_email,
                     [email, code_type.value, row.id],
                 )

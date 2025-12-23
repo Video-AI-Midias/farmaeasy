@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28.0",
     "starlette-compress>=1.0.1",
     "cassandra-driver>=3.29.0",
+    "cassandra-asyncio-driver>=0.1.4",
     "redis>=5.2.0",
     # Authentication
     "argon2-cffi>=23.1.0",

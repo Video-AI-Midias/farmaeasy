@@ -159,12 +159,14 @@ class LessonService:
             f"SELECT * FROM {self.keyspace}.modules_by_lesson WHERE lesson_id = ?"
         )
 
-    def create_lesson(self, data: CreateLessonRequest, creator_id: UUID) -> Lesson:
+    async def create_lesson(
+        self, data: CreateLessonRequest, creator_id: UUID
+    ) -> Lesson:
         """Create a new lesson."""
         slug = generate_slug(data.title)
 
         # Check slug uniqueness
-        existing = self.get_lesson_by_slug(slug)
+        existing = await self.get_lesson_by_slug(slug)
         if existing:
             # Append UUID suffix if slug exists
             slug = f"{slug}-{str(creator_id)[:8]}"
@@ -180,7 +182,7 @@ class LessonService:
             creator_id=creator_id,
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_lesson,
             [
                 lesson.id,
@@ -199,26 +201,26 @@ class LessonService:
 
         return lesson
 
-    def get_lesson(self, lesson_id: UUID) -> Lesson | None:
+    async def get_lesson(self, lesson_id: UUID) -> Lesson | None:
         """Get lesson by ID."""
-        rows = self.session.execute(self._get_lesson_by_id, [lesson_id])
+        rows = await self.session.aexecute(self._get_lesson_by_id, [lesson_id])
         row = rows.one()
         return Lesson.from_row(row) if row else None
 
-    def get_lesson_by_slug(self, slug: str) -> Lesson | None:
+    async def get_lesson_by_slug(self, slug: str) -> Lesson | None:
         """Get lesson by slug."""
-        rows = self.session.execute(self._get_lesson_by_slug, [slug])
+        rows = await self.session.aexecute(self._get_lesson_by_slug, [slug])
         row = rows.one()
         return Lesson.from_row(row) if row else None
 
-    def update_lesson(self, lesson_id: UUID, data: UpdateLessonRequest) -> Lesson:
+    async def update_lesson(self, lesson_id: UUID, data: UpdateLessonRequest) -> Lesson:
         """Update lesson.
 
         Raises:
             LessonNotFoundError: If lesson doesn't exist
             InvalidContentError: If trying to publish an invalid lesson
         """
-        lesson = self.get_lesson(lesson_id)
+        lesson = await self.get_lesson(lesson_id)
         if not lesson:
             raise LessonNotFoundError
 
@@ -255,7 +257,7 @@ class LessonService:
 
         lesson.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_lesson,
             [
                 lesson.title,
@@ -272,7 +274,7 @@ class LessonService:
 
         return lesson
 
-    def delete_lesson(self, lesson_id: UUID, force: bool = False) -> int:
+    async def delete_lesson(self, lesson_id: UUID, force: bool = False) -> int:
         """Delete lesson.
 
         Args:
@@ -286,12 +288,12 @@ class LessonService:
             LessonNotFoundError: If lesson doesn't exist
             LessonInUseError: If lesson is in use and force=False
         """
-        lesson = self.get_lesson(lesson_id)
+        lesson = await self.get_lesson(lesson_id)
         if not lesson:
             raise LessonNotFoundError
 
         # Check if lesson is used by any module
-        rows = self.session.execute(self._get_modules_by_lesson, [lesson_id])
+        rows = await self.session.aexecute(self._get_modules_by_lesson, [lesson_id])
         usages = list(rows)
 
         if usages and not force:
@@ -303,20 +305,20 @@ class LessonService:
             for usage in usages:
                 module_id = usage.module_id
                 # Delete from module_lessons
-                self.session.execute(
+                await self.session.aexecute(
                     f"DELETE FROM {self.keyspace}.module_lessons WHERE module_id = ? AND position = ? AND lesson_id = ?",
                     [module_id, usage.position, lesson_id],
                 )
                 # Delete from modules_by_lesson
-                self.session.execute(
+                await self.session.aexecute(
                     self._delete_modules_by_lesson, [lesson_id, module_id]
                 )
                 unlinked_count += 1
 
-        self.session.execute(self._delete_lesson, [lesson_id])
+        await self.session.aexecute(self._delete_lesson, [lesson_id])
         return unlinked_count
 
-    def list_lessons(
+    async def list_lessons(
         self,
         status: ContentStatus | None = None,
         content_type: ContentType | None = None,
@@ -329,7 +331,7 @@ class LessonService:
         """
         # Simple approach - scan all and filter in memory
         cql = f"SELECT * FROM {self.keyspace}.lessons LIMIT {limit * 2}"
-        rows = self.session.execute(cql)
+        rows = await self.session.aexecute(cql)
 
         lessons = []
         for row in rows:
@@ -344,16 +346,16 @@ class LessonService:
 
         return lessons
 
-    def get_modules_using_lesson(self, lesson_id: UUID) -> list[Module]:
+    async def get_modules_using_lesson(self, lesson_id: UUID) -> list[Module]:
         """Get all modules that use this lesson."""
-        rows = self.session.execute(self._get_modules_by_lesson, [lesson_id])
+        rows = await self.session.aexecute(self._get_modules_by_lesson, [lesson_id])
         module_ids = [row.module_id for row in rows]
 
         modules = []
         for mid in module_ids:
             # Need to get module details from modules table
             cql = f"SELECT * FROM {self.keyspace}.modules WHERE id = ?"
-            mod_rows = self.session.execute(cql, [mid])
+            mod_rows = await self.session.aexecute(cql, [mid])
             mod_row = mod_rows.one()
             if mod_row:
                 modules.append(Module.from_row(mod_row))
@@ -462,12 +464,14 @@ class ModuleService:
             f"SELECT * FROM {self.keyspace}.courses_by_module WHERE module_id = ?"
         )
 
-    def create_module(self, data: CreateModuleRequest, creator_id: UUID) -> Module:
+    async def create_module(
+        self, data: CreateModuleRequest, creator_id: UUID
+    ) -> Module:
         """Create a new module."""
         slug = generate_slug(data.title)
 
         # Check slug uniqueness
-        existing = self.get_module_by_slug(slug)
+        existing = await self.get_module_by_slug(slug)
         if existing:
             slug = f"{slug}-{str(creator_id)[:8]}"
 
@@ -480,7 +484,7 @@ class ModuleService:
             creator_id=creator_id,
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_module,
             [
                 module.id,
@@ -497,21 +501,21 @@ class ModuleService:
 
         return module
 
-    def get_module(self, module_id: UUID) -> Module | None:
+    async def get_module(self, module_id: UUID) -> Module | None:
         """Get module by ID."""
-        rows = self.session.execute(self._get_module_by_id, [module_id])
+        rows = await self.session.aexecute(self._get_module_by_id, [module_id])
         row = rows.one()
         return Module.from_row(row) if row else None
 
-    def get_module_by_slug(self, slug: str) -> Module | None:
+    async def get_module_by_slug(self, slug: str) -> Module | None:
         """Get module by slug."""
-        rows = self.session.execute(self._get_module_by_slug, [slug])
+        rows = await self.session.aexecute(self._get_module_by_slug, [slug])
         row = rows.one()
         return Module.from_row(row) if row else None
 
-    def update_module(self, module_id: UUID, data: UpdateModuleRequest) -> Module:
+    async def update_module(self, module_id: UUID, data: UpdateModuleRequest) -> Module:
         """Update module."""
-        module = self.get_module(module_id)
+        module = await self.get_module(module_id)
         if not module:
             raise ModuleNotFoundError
 
@@ -527,7 +531,7 @@ class ModuleService:
 
         module.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_module,
             [
                 module.title,
@@ -542,7 +546,7 @@ class ModuleService:
 
         return module
 
-    def delete_module(self, module_id: UUID, force: bool = False) -> int:
+    async def delete_module(self, module_id: UUID, force: bool = False) -> int:
         """Delete module.
 
         Args:
@@ -556,12 +560,12 @@ class ModuleService:
             ModuleNotFoundError: If module doesn't exist
             ModuleInUseError: If module is in use and force=False
         """
-        module = self.get_module(module_id)
+        module = await self.get_module(module_id)
         if not module:
             raise ModuleNotFoundError
 
         # Check if module is used by any course
-        rows = self.session.execute(self._get_courses_by_module, [module_id])
+        rows = await self.session.aexecute(self._get_courses_by_module, [module_id])
         usages = list(rows)
 
         if usages and not force:
@@ -573,42 +577,44 @@ class ModuleService:
             for usage in usages:
                 course_id = usage.course_id
                 # Delete from course_modules
-                self.session.execute(
+                await self.session.aexecute(
                     f"DELETE FROM {self.keyspace}.course_modules WHERE course_id = ? AND position = ? AND module_id = ?",
                     [course_id, usage.position, module_id],
                 )
                 # Delete from modules_by_course
-                self.session.execute(
+                await self.session.aexecute(
                     self._delete_modules_by_course, [course_id, module_id]
                 )
                 # Delete from courses_by_module
-                self.session.execute(
+                await self.session.aexecute(
                     self._delete_courses_by_module, [module_id, course_id]
                 )
                 unlinked_count += 1
 
         # Delete all lesson links
-        self.session.execute(self._delete_all_module_lessons, [module_id])
+        await self.session.aexecute(self._delete_all_module_lessons, [module_id])
 
         # Also clean up modules_by_lesson for all lessons in this module
-        lesson_links = self.session.execute(self._get_module_lessons, [module_id])
+        lesson_links = await self.session.aexecute(
+            self._get_module_lessons, [module_id]
+        )
         for link in lesson_links:
-            self.session.execute(
+            await self.session.aexecute(
                 self._delete_modules_by_lesson, [link.lesson_id, module_id]
             )
 
         # Delete module
-        self.session.execute(self._delete_module, [module_id])
+        await self.session.aexecute(self._delete_module, [module_id])
         return unlinked_count
 
-    def list_modules(
+    async def list_modules(
         self,
         status: ContentStatus | None = None,
         limit: int = 50,
     ) -> list[Module]:
         """List modules with optional filters."""
         cql = f"SELECT * FROM {self.keyspace}.modules LIMIT {limit * 2}"
-        rows = self.session.execute(cql)
+        rows = await self.session.aexecute(cql)
 
         modules = []
         for row in rows:
@@ -625,7 +631,7 @@ class ModuleService:
     # Lesson Linking
     # --------------------------------------------------------------------------
 
-    def link_lesson(
+    async def link_lesson(
         self,
         module_id: UUID,
         lesson_id: UUID,
@@ -634,18 +640,20 @@ class ModuleService:
     ) -> ModuleLesson:
         """Link a lesson to a module."""
         # Verify module exists
-        module = self.get_module(module_id)
+        module = await self.get_module(module_id)
         if not module:
             raise ModuleNotFoundError
 
         # Check if already linked
-        rows = self.session.execute(self._get_lesson_in_module, [module_id, lesson_id])
+        rows = await self.session.aexecute(
+            self._get_lesson_in_module, [module_id, lesson_id]
+        )
         if rows.one():
             raise AlreadyLinkedError("Aula ja vinculada a este modulo")
 
         # Auto-calculate position if not provided
         if position is None:
-            lessons = self.get_module_lessons(module_id)
+            lessons = await self.get_module_lessons(module_id)
             position = len(lessons)
 
         now = datetime.now(UTC)
@@ -658,25 +666,27 @@ class ModuleService:
         )
 
         # Dual-write pattern
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_module_lesson,
             [module_id, lesson_id, position, now, user_id],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_lessons_by_module,
             [module_id, lesson_id, position],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_modules_by_lesson,
             [lesson_id, module_id],
         )
 
         return link
 
-    def unlink_lesson(self, module_id: UUID, lesson_id: UUID) -> None:
+    async def unlink_lesson(self, module_id: UUID, lesson_id: UUID) -> None:
         """Unlink a lesson from a module."""
         # Find the link to get position
-        rows = self.session.execute(self._get_lesson_in_module, [module_id, lesson_id])
+        rows = await self.session.aexecute(
+            self._get_lesson_in_module, [module_id, lesson_id]
+        )
         row = rows.one()
         if not row:
             raise NotLinkedError("Aula nao vinculada a este modulo")
@@ -684,21 +694,27 @@ class ModuleService:
         position = row.position
 
         # Delete from all tables
-        self.session.execute(
+        await self.session.aexecute(
             self._delete_module_lesson, [module_id, position, lesson_id]
         )
-        self.session.execute(self._delete_lessons_by_module, [module_id, lesson_id])
-        self.session.execute(self._delete_modules_by_lesson, [lesson_id, module_id])
+        await self.session.aexecute(
+            self._delete_lessons_by_module, [module_id, lesson_id]
+        )
+        await self.session.aexecute(
+            self._delete_modules_by_lesson, [lesson_id, module_id]
+        )
 
-    def get_module_lessons(self, module_id: UUID) -> list[tuple[Lesson, int]]:
+    async def get_module_lessons(self, module_id: UUID) -> list[tuple[Lesson, int]]:
         """Get all lessons in a module with their positions."""
-        rows = self.session.execute(self._get_module_lessons, [module_id])
+        rows = await self.session.aexecute(self._get_module_lessons, [module_id])
 
         results = []
         for row in rows:
             link = ModuleLesson.from_row(row)
             # Get lesson details using prepared statement
-            lesson_rows = self.session.execute(self._get_lesson_by_id, [link.lesson_id])
+            lesson_rows = await self.session.aexecute(
+                self._get_lesson_by_id, [link.lesson_id]
+            )
             lesson_row = lesson_rows.one()
             if lesson_row:
                 lesson = Lesson.from_row(lesson_row)
@@ -708,12 +724,12 @@ class ModuleService:
         results.sort(key=lambda x: x[1])
         return results
 
-    def reorder_lessons(
+    async def reorder_lessons(
         self, module_id: UUID, lesson_ids: list[UUID], user_id: UUID
     ) -> None:
         """Reorder lessons in a module."""
         # Get current links
-        current_lessons = self.get_module_lessons(module_id)
+        current_lessons = await self.get_module_lessons(module_id)
         current_ids = {lesson.id for lesson, _ in current_lessons}
 
         # Verify all IDs exist in current lessons
@@ -722,38 +738,38 @@ class ModuleService:
             raise CourseError(msg, "invalid_reorder")
 
         # Delete all current links
-        self.session.execute(self._delete_all_module_lessons, [module_id])
+        await self.session.aexecute(self._delete_all_module_lessons, [module_id])
 
         # Re-insert with new positions
         now = datetime.now(UTC)
         for position, lesson_id in enumerate(lesson_ids):
-            self.session.execute(
+            await self.session.aexecute(
                 self._insert_module_lesson,
                 [module_id, lesson_id, position, now, user_id],
             )
-            self.session.execute(
+            await self.session.aexecute(
                 self._insert_lessons_by_module,
                 [module_id, lesson_id, position],
             )
 
-    def get_courses_using_module(self, module_id: UUID) -> list[Course]:
+    async def get_courses_using_module(self, module_id: UUID) -> list[Course]:
         """Get all courses that use this module."""
-        rows = self.session.execute(self._get_courses_by_module, [module_id])
+        rows = await self.session.aexecute(self._get_courses_by_module, [module_id])
         course_ids = [row.course_id for row in rows]
 
         courses = []
         for cid in course_ids:
             cql = f"SELECT * FROM {self.keyspace}.courses WHERE id = ?"
-            course_rows = self.session.execute(cql, [cid])
+            course_rows = await self.session.aexecute(cql, [cid])
             course_row = course_rows.one()
             if course_row:
                 courses.append(Course.from_row(course_row))
 
         return courses
 
-    def get_lesson_count(self, module_id: UUID) -> int:
+    async def get_lesson_count(self, module_id: UUID) -> int:
         """Get number of lessons in a module."""
-        rows = self.session.execute(self._get_module_lessons, [module_id])
+        rows = await self.session.aexecute(self._get_module_lessons, [module_id])
         return len(list(rows))
 
     def to_response(self, module: Module, lesson_count: int = 0) -> ModuleResponse:
@@ -876,12 +892,14 @@ class CourseService:
             f"SELECT * FROM {self.keyspace}.modules WHERE id = ?"
         )
 
-    def create_course(self, data: CreateCourseRequest, creator_id: UUID) -> Course:
+    async def create_course(
+        self, data: CreateCourseRequest, creator_id: UUID
+    ) -> Course:
         """Create a new course."""
         slug = generate_slug(data.title)
 
         # Check slug uniqueness
-        existing = self.get_course_by_slug(slug)
+        existing = await self.get_course_by_slug(slug)
         if existing:
             slug = f"{slug}-{str(creator_id)[:8]}"
 
@@ -898,7 +916,7 @@ class CourseService:
         )
 
         # Insert into main table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_course,
             [
                 course.id,
@@ -917,7 +935,7 @@ class CourseService:
         )
 
         # Insert into filter tables
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_course_by_status,
             [
                 course.status,
@@ -928,7 +946,7 @@ class CourseService:
                 course.creator_id,
             ],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_course_by_creator,
             [
                 course.creator_id,
@@ -942,21 +960,21 @@ class CourseService:
 
         return course
 
-    def get_course(self, course_id: UUID) -> Course | None:
+    async def get_course(self, course_id: UUID) -> Course | None:
         """Get course by ID."""
-        rows = self.session.execute(self._get_course_by_id, [course_id])
+        rows = await self.session.aexecute(self._get_course_by_id, [course_id])
         row = rows.one()
         return Course.from_row(row) if row else None
 
-    def get_course_by_slug(self, slug: str) -> Course | None:
+    async def get_course_by_slug(self, slug: str) -> Course | None:
         """Get course by slug."""
-        rows = self.session.execute(self._get_course_by_slug, [slug])
+        rows = await self.session.aexecute(self._get_course_by_slug, [slug])
         row = rows.one()
         return Course.from_row(row) if row else None
 
-    def update_course(self, course_id: UUID, data: UpdateCourseRequest) -> Course:
+    async def update_course(self, course_id: UUID, data: UpdateCourseRequest) -> Course:
         """Update course."""
-        course = self.get_course(course_id)
+        course = await self.get_course(course_id)
         if not course:
             raise CourseNotFoundError
 
@@ -980,7 +998,7 @@ class CourseService:
         course.updated_at = datetime.now(UTC)
 
         # Update main table
-        self.session.execute(
+        await self.session.aexecute(
             self._update_course,
             [
                 course.title,
@@ -998,12 +1016,12 @@ class CourseService:
         # Update filter tables if status changed
         if old_status != course.status:
             # Delete from old status
-            self.session.execute(
+            await self.session.aexecute(
                 self._delete_course_by_status,
                 [old_status, old_created_at, course.id],
             )
             # Insert into new status
-            self.session.execute(
+            await self.session.aexecute(
                 self._insert_course_by_status,
                 [
                     course.status,
@@ -1017,60 +1035,62 @@ class CourseService:
 
         return course
 
-    def delete_course(self, course_id: UUID) -> None:
+    async def delete_course(self, course_id: UUID) -> None:
         """Delete course."""
-        course = self.get_course(course_id)
+        course = await self.get_course(course_id)
         if not course:
             raise CourseNotFoundError
 
         # Delete all module links
-        modules = self.get_course_modules(course_id)
+        modules = await self.get_course_modules(course_id)
         for module, _ in modules:
-            self.unlink_module(course_id, module.id)
+            await self.unlink_module(course_id, module.id)
 
         # Delete from filter tables
-        self.session.execute(
+        await self.session.aexecute(
             self._delete_course_by_status,
             [course.status, course.created_at, course.id],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._delete_course_by_creator,
             [course.creator_id, course.created_at, course.id],
         )
 
         # Delete course
-        self.session.execute(self._delete_course, [course_id])
+        await self.session.aexecute(self._delete_course, [course_id])
 
-    def list_courses(
+    async def list_courses(
         self,
         status: ContentStatus | None = None,
         limit: int = 50,
     ) -> list[Course]:
         """List courses with optional status filter."""
         if status:
-            rows = self.session.execute(
+            rows = await self.session.aexecute(
                 self._get_courses_by_status, [status.value, limit]
             )
             courses = []
             for row in rows:
                 # Get full course data
-                course = self.get_course(row.course_id)
+                course = await self.get_course(row.course_id)
                 if course:
                     courses.append(course)
             return courses
         else:
             cql = f"SELECT * FROM {self.keyspace}.courses LIMIT {limit}"
-            rows = self.session.execute(cql)
+            rows = await self.session.aexecute(cql)
             return [Course.from_row(row) for row in rows]
 
-    def list_courses_by_creator(
+    async def list_courses_by_creator(
         self, creator_id: UUID, limit: int = 50
     ) -> list[Course]:
         """List courses by creator."""
-        rows = self.session.execute(self._get_courses_by_creator, [creator_id, limit])
+        rows = await self.session.aexecute(
+            self._get_courses_by_creator, [creator_id, limit]
+        )
         courses = []
         for row in rows:
-            course = self.get_course(row.course_id)
+            course = await self.get_course(row.course_id)
             if course:
                 courses.append(course)
         return courses
@@ -1079,7 +1099,7 @@ class CourseService:
     # Module Linking
     # --------------------------------------------------------------------------
 
-    def link_module(
+    async def link_module(
         self,
         course_id: UUID,
         module_id: UUID,
@@ -1088,23 +1108,25 @@ class CourseService:
     ) -> CourseModule:
         """Link a module to a course."""
         # Verify course exists
-        course = self.get_course(course_id)
+        course = await self.get_course(course_id)
         if not course:
             raise CourseNotFoundError
 
         # Verify module exists
-        module_rows = self.session.execute(self._get_module_by_id, [module_id])
+        module_rows = await self.session.aexecute(self._get_module_by_id, [module_id])
         if not module_rows.one():
             raise ModuleNotFoundError
 
         # Check if already linked
-        rows = self.session.execute(self._get_module_in_course, [course_id, module_id])
+        rows = await self.session.aexecute(
+            self._get_module_in_course, [course_id, module_id]
+        )
         if rows.one():
             raise AlreadyLinkedError("Modulo ja vinculado a este curso")
 
         # Auto-calculate position if not provided
         if position is None:
-            modules = self.get_course_modules(course_id)
+            modules = await self.get_course_modules(course_id)
             position = len(modules)
 
         now = datetime.now(UTC)
@@ -1117,25 +1139,27 @@ class CourseService:
         )
 
         # Dual-write pattern
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_course_module,
             [course_id, module_id, position, now, user_id],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_modules_by_course,
             [course_id, module_id, position],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_courses_by_module,
             [module_id, course_id],
         )
 
         return link
 
-    def unlink_module(self, course_id: UUID, module_id: UUID) -> None:
+    async def unlink_module(self, course_id: UUID, module_id: UUID) -> None:
         """Unlink a module from a course."""
         # Find the link to get position
-        rows = self.session.execute(self._get_module_in_course, [course_id, module_id])
+        rows = await self.session.aexecute(
+            self._get_module_in_course, [course_id, module_id]
+        )
         row = rows.one()
         if not row:
             raise NotLinkedError("Modulo nao vinculado a este curso")
@@ -1143,21 +1167,27 @@ class CourseService:
         position = row.position
 
         # Delete from all tables
-        self.session.execute(
+        await self.session.aexecute(
             self._delete_course_module, [course_id, position, module_id]
         )
-        self.session.execute(self._delete_modules_by_course, [course_id, module_id])
-        self.session.execute(self._delete_courses_by_module, [module_id, course_id])
+        await self.session.aexecute(
+            self._delete_modules_by_course, [course_id, module_id]
+        )
+        await self.session.aexecute(
+            self._delete_courses_by_module, [module_id, course_id]
+        )
 
-    def get_course_modules(self, course_id: UUID) -> list[tuple[Module, int]]:
+    async def get_course_modules(self, course_id: UUID) -> list[tuple[Module, int]]:
         """Get all modules in a course with their positions."""
-        rows = self.session.execute(self._get_course_modules, [course_id])
+        rows = await self.session.aexecute(self._get_course_modules, [course_id])
 
         results = []
         for row in rows:
             link = CourseModule.from_row(row)
             # Get module details using prepared statement
-            module_rows = self.session.execute(self._get_module_by_id, [link.module_id])
+            module_rows = await self.session.aexecute(
+                self._get_module_by_id, [link.module_id]
+            )
             module_row = module_rows.one()
             if module_row:
                 module = Module.from_row(module_row)
@@ -1167,12 +1197,12 @@ class CourseService:
         results.sort(key=lambda x: x[1])
         return results
 
-    def reorder_modules(
+    async def reorder_modules(
         self, course_id: UUID, module_ids: list[UUID], user_id: UUID
     ) -> None:
         """Reorder modules in a course."""
         # Get current links
-        current_modules = self.get_course_modules(course_id)
+        current_modules = await self.get_course_modules(course_id)
         current_ids = {module.id for module, _ in current_modules}
 
         # Verify all IDs exist in current modules
@@ -1181,23 +1211,23 @@ class CourseService:
             raise CourseError(msg, "invalid_reorder")
 
         # Delete all current links
-        self.session.execute(self._delete_all_course_modules, [course_id])
+        await self.session.aexecute(self._delete_all_course_modules, [course_id])
 
         # Re-insert with new positions
         now = datetime.now(UTC)
         for position, module_id in enumerate(module_ids):
-            self.session.execute(
+            await self.session.aexecute(
                 self._insert_course_module,
                 [course_id, module_id, position, now, user_id],
             )
-            self.session.execute(
+            await self.session.aexecute(
                 self._insert_modules_by_course,
                 [course_id, module_id, position],
             )
 
-    def get_module_count(self, course_id: UUID) -> int:
+    async def get_module_count(self, course_id: UUID) -> int:
         """Get number of modules in a course."""
-        rows = self.session.execute(self._get_course_modules, [course_id])
+        rows = await self.session.aexecute(self._get_course_modules, [course_id])
         return len(list(rows))
 
     def to_response(self, course: Course, module_count: int = 0) -> CourseResponse:

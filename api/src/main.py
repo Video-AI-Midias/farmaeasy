@@ -21,7 +21,7 @@ from src.comments.router import router as comments_router
 from src.comments.service import CommentService
 from src.config import get_settings
 from src.core.context import get_request_id
-from src.core.database import init_cassandra, shutdown_cassandra
+from src.core.database import init_async_cassandra, shutdown_async_cassandra
 from src.core.logging import configure_structlog, get_logger
 from src.core.middleware import RequestContextMiddleware
 from src.core.redis import init_redis, shutdown_redis
@@ -147,9 +147,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             message="Running without Redis - real-time notifications disabled",
         )
 
-    # Initialize Cassandra
+    # Initialize Cassandra (async)
     try:
-        app_state.cassandra_session = init_cassandra()
+        app_state.cassandra_session = await init_async_cassandra()
         logger.info("cassandra_initialized")
 
         # Initialize AuthService
@@ -231,6 +231,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     email_service=app_state.email_service,
                     auth_service=app_state.auth_service,
                 )
+                await app_state.verification_service.initialize()
                 app.state.verification_service = app_state.verification_service
                 logger.info("verification_service_initialized")
         except Exception as e:
@@ -245,7 +246,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("shutting_down_application")
     await shutdown_redis()
-    shutdown_cassandra()
+    await shutdown_async_cassandra()
 
 
 def create_app() -> FastAPI:

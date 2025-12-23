@@ -88,11 +88,11 @@ async def broadcast_notification(
     target = body.target.lower()
 
     if target == "all":
-        users = auth_service.list_active_users()
+        users = await auth_service.list_active_users()
     elif target == "students":
-        users = auth_service.list_users_by_role(UserRole.STUDENT)
+        users = await auth_service.list_users_by_role(UserRole.STUDENT)
     elif target == "teachers":
-        users = auth_service.list_users_by_role(UserRole.TEACHER)
+        users = await auth_service.list_users_by_role(UserRole.TEACHER)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

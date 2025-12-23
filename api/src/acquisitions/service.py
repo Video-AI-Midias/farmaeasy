@@ -158,10 +158,11 @@ class AcquisitionService:
                 return cached == b"1"
 
         # Query database
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_user_course_acquisition,
             [user_id, course_id],
-        ).one()
+        )
+        row = result.one()
 
         has_access = False
         if row:
@@ -220,10 +221,11 @@ class AcquisitionService:
             )
 
         # 3. Check actual acquisition (students)
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_user_course_acquisition,
             [user_id, course_id],
-        ).one()
+        )
+        row = result.one()
 
         if not row:
             return CheckAccessResponse(has_access=False, can_enroll=True)
@@ -301,7 +303,7 @@ class AcquisitionService:
         """
         # Check if already has active access by querying ALL acquisitions
         # and checking if ANY is active (prevents race conditions)
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_user_acquisitions,
             [user_id],
         )
@@ -410,7 +412,7 @@ class AcquisitionService:
             True if access was revoked, False if no active access found
         """
         # Query ALL acquisitions to avoid non-deterministic LIMIT 1
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_user_acquisitions,
             [user_id],
         )
@@ -428,7 +430,7 @@ class AcquisitionService:
 
         # Update status to revoked
         now = datetime.now(UTC)
-        self.session.execute(
+        await self.session.aexecute(
             self._update_status,
             [
                 AcquisitionStatus.REVOKED.value,
@@ -440,7 +442,7 @@ class AcquisitionService:
         )
 
         # Update by_course table
-        self.session.execute(
+        await self.session.aexecute(
             self._update_status_by_course,
             [
                 AcquisitionStatus.REVOKED.value,
@@ -480,7 +482,7 @@ class AcquisitionService:
         Returns:
             List of acquisitions
         """
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_user_acquisitions,
             [user_id],
         )
@@ -514,7 +516,7 @@ class AcquisitionService:
         Returns:
             List of acquisitions (deduplicated, most recent per user)
         """
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_course_acquisitions,
             [course_id, limit],
         )
@@ -531,7 +533,7 @@ class AcquisitionService:
                 continue
 
             # Fetch ALL acquisitions for this user to avoid non-deterministic LIMIT 1
-            user_rows = self.session.execute(
+            user_rows = await self.session.aexecute(
                 self._get_user_acquisitions,
                 [row.user_id],
             )
@@ -566,10 +568,11 @@ class AcquisitionService:
         Returns:
             Number of students with access
         """
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._count_course_acquisitions,
             [course_id],
-        ).one()
+        )
+        row = result.one()
 
         return row.count if row else 0
 
@@ -580,7 +583,7 @@ class AcquisitionService:
     async def _save_acquisition(self, acquisition: CourseAcquisition) -> None:
         """Save acquisition to both tables (dual-write pattern)."""
         # Main table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_acquisition,
             [
                 acquisition.user_id,
@@ -601,7 +604,7 @@ class AcquisitionService:
         )
 
         # By-course lookup table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_acquisition_by_course,
             [
                 acquisition.course_id,

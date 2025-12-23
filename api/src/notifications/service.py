@@ -147,7 +147,7 @@ class NotificationService:
 
     async def create_notification(self, notification: Notification) -> Notification:
         """Create a new notification."""
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_notification,
             [
                 notification.user_id,
@@ -171,7 +171,7 @@ class NotificationService:
         )
 
         # Increment unread counter
-        self.session.execute(self._incr_unread, [notification.user_id])
+        await self.session.aexecute(self._incr_unread, [notification.user_id])
 
         # Invalidate cache and publish to Redis for real-time updates
         await self._invalidate_cache(notification.user_id)
@@ -365,12 +365,12 @@ class NotificationService:
         # Query with or without cursor
         if cursor:
             created_at, _ = decode_cursor(cursor)
-            rows = self.session.execute(
+            rows = await self.session.aexecute(
                 self._get_notifications_cursor,
                 [user_id, created_at, limit + 1],
             )
         else:
-            rows = self.session.execute(
+            rows = await self.session.aexecute(
                 self._get_notifications,
                 [user_id, limit + 1],
             )
@@ -417,10 +417,11 @@ class NotificationService:
                 return int(cached)
 
         # Query from counter table
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_unread_count,
             [user_id],
-        ).one()
+        )
+        row = result.one()
 
         count = row.count if row and row.count else 0
 
@@ -458,14 +459,14 @@ class NotificationService:
 
         # For each notification, we need to find it first to get created_at
         # This is inefficient - in production you'd include created_at in the request
-        all_rows = self.session.execute(
+        all_rows = await self.session.aexecute(
             self._get_notifications,
             [user_id, 1000],  # Get recent notifications
         )
 
         for row in all_rows:
             if row.notification_id in notification_ids and not row.is_read:
-                self.session.execute(
+                await self.session.aexecute(
                     self._mark_read,
                     [now, user_id, row.created_at, row.notification_id],
                 )
@@ -473,7 +474,7 @@ class NotificationService:
 
         # Decrement unread counter
         if marked > 0:
-            self.session.execute(self._decr_unread, [marked, user_id])
+            await self.session.aexecute(self._decr_unread, [marked, user_id])
             await self._invalidate_cache(user_id)
 
         return marked
@@ -487,14 +488,14 @@ class NotificationService:
         marked = 0
 
         # Get all unread notifications
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_notifications,
             [user_id, 1000],
         )
 
         for row in rows:
             if not row.is_read:
-                self.session.execute(
+                await self.session.aexecute(
                     self._mark_read,
                     [now, user_id, row.created_at, row.notification_id],
                 )
@@ -502,7 +503,7 @@ class NotificationService:
 
         # Reset unread counter
         if marked > 0:
-            self.session.execute(self._decr_unread, [marked, user_id])
+            await self.session.aexecute(self._decr_unread, [marked, user_id])
             await self._invalidate_cache(user_id)
 
         return marked

@@ -78,7 +78,7 @@ async def create_course(
     user: TeacherUser,
 ) -> CourseResponse:
     """Create a new course (TEACHER or ADMIN only)."""
-    course = course_service.create_course(data, UUID(str(user.id)))
+    course = await course_service.create_course(data, UUID(str(user.id)))
     return course_service.to_response(course)
 
 
@@ -92,11 +92,13 @@ async def list_published_courses(
     limit: int = 50,
 ) -> CourseListResponse:
     """List all published courses (public)."""
-    courses = course_service.list_courses(status=ContentStatus.PUBLISHED, limit=limit)
-    items = [
-        course_service.to_response(c, course_service.get_module_count(c.id))
-        for c in courses
-    ]
+    courses = await course_service.list_courses(
+        status=ContentStatus.PUBLISHED, limit=limit
+    )
+    items = []
+    for c in courses:
+        module_count = await course_service.get_module_count(c.id)
+        items.append(course_service.to_response(c, module_count))
     return CourseListResponse(
         items=items,
         total=len(items),
@@ -116,12 +118,12 @@ async def list_all_courses(
     limit: int = 50,
 ) -> CourseListResponse:
     """List all courses with optional filters (TEACHER/ADMIN only)."""
-    courses = course_service.list_courses(status=status_filter, limit=limit)
-    items = [
-        course_service.to_response(c, course_service.get_module_count(c.id))
-        for c in courses
-        if can_view_content(user, c.status, c.creator_id)
-    ]
+    courses = await course_service.list_courses(status=status_filter, limit=limit)
+    items = []
+    for c in courses:
+        if can_view_content(user, c.status, c.creator_id):
+            module_count = await course_service.get_module_count(c.id)
+            items.append(course_service.to_response(c, module_count))
     return CourseListResponse(
         items=items,
         total=len(items),
@@ -140,11 +142,11 @@ async def list_my_courses(
     limit: int = 50,
 ) -> CourseListResponse:
     """List courses created by current user."""
-    courses = course_service.list_courses_by_creator(UUID(str(user.id)), limit)
-    items = [
-        course_service.to_response(c, course_service.get_module_count(c.id))
-        for c in courses
-    ]
+    courses = await course_service.list_courses_by_creator(UUID(str(user.id)), limit)
+    items = []
+    for c in courses:
+        module_count = await course_service.get_module_count(c.id)
+        items.append(course_service.to_response(c, module_count))
     return CourseListResponse(
         items=items,
         total=len(items),
@@ -169,7 +171,7 @@ async def get_course(
 
     Includes user-specific access information when authenticated.
     """
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -197,7 +199,7 @@ async def get_course(
         )
 
     # Get modules with lessons
-    modules_with_pos = course_service.get_course_modules(course_id)
+    modules_with_pos = await course_service.get_course_modules(course_id)
     module_responses = []
 
     for module, pos in modules_with_pos:
@@ -206,7 +208,7 @@ async def get_course(
             continue
 
         # Get lessons for this module
-        lessons_with_pos = module_service.get_module_lessons(module.id)
+        lessons_with_pos = await module_service.get_module_lessons(module.id)
         lesson_responses = []
 
         for lesson, lesson_pos in lessons_with_pos:
@@ -284,7 +286,7 @@ async def get_course_by_slug(
     user: OptionalUser,
 ) -> CourseDetailResponse:
     """Get course by slug with nested modules and lessons."""
-    course = course_service.get_course_by_slug(slug)
+    course = await course_service.get_course_by_slug(slug)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -314,7 +316,7 @@ async def update_course(
     user: TeacherUser,
 ) -> CourseResponse:
     """Update course (owner or ADMIN only)."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -328,10 +330,9 @@ async def update_course(
         )
 
     try:
-        updated = course_service.update_course(course_id, data)
-        return course_service.to_response(
-            updated, course_service.get_module_count(course_id)
-        )
+        updated = await course_service.update_course(course_id, data)
+        module_count = await course_service.get_module_count(course_id)
+        return course_service.to_response(updated, module_count)
     except CourseError as e:
         raise handle_course_error(e) from e
 
@@ -347,7 +348,7 @@ async def delete_course(
     user: TeacherUser,
 ) -> None:
     """Delete course (owner or ADMIN only)."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -361,7 +362,7 @@ async def delete_course(
         )
 
     try:
-        course_service.delete_course(course_id)
+        await course_service.delete_course(course_id)
     except CourseError as e:
         raise handle_course_error(e) from e
 
@@ -383,7 +384,7 @@ async def list_course_modules(
     user: OptionalUser,
 ) -> list[ModuleInCourseResponse]:
     """List all modules in a course."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -396,11 +397,12 @@ async def list_course_modules(
             detail="Sem permissao para visualizar este curso",
         )
 
-    modules_with_pos = course_service.get_course_modules(course_id)
+    modules_with_pos = await course_service.get_course_modules(course_id)
     responses = []
 
     for module, pos in modules_with_pos:
         if can_view_content(user, module.status, module.creator_id):
+            lesson_count = await module_service.get_lesson_count(module.id)
             responses.append(
                 ModuleInCourseResponse(
                     id=module.id,
@@ -412,7 +414,7 @@ async def list_course_modules(
                     creator_id=module.creator_id,
                     created_at=module.created_at,
                     updated_at=module.updated_at,
-                    lesson_count=module_service.get_lesson_count(module.id),
+                    lesson_count=lesson_count,
                     position=pos,
                 )
             )
@@ -433,7 +435,7 @@ async def link_module_to_course(
     user: TeacherUser,
 ) -> MessageResponse:
     """Link an existing module to a course."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -447,7 +449,7 @@ async def link_module_to_course(
         )
 
     try:
-        course_service.link_module(
+        await course_service.link_module(
             course_id, data.module_id, data.position, UUID(str(user.id))
         )
         return MessageResponse(message="Modulo vinculado com sucesso")
@@ -467,7 +469,7 @@ async def unlink_module_from_course(
     user: TeacherUser,
 ) -> None:
     """Unlink a module from a course."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -481,7 +483,7 @@ async def unlink_module_from_course(
         )
 
     try:
-        course_service.unlink_module(course_id, module_id)
+        await course_service.unlink_module(course_id, module_id)
     except NotLinkedError as e:
         raise handle_course_error(e) from e
 
@@ -498,7 +500,7 @@ async def reorder_course_modules(
     user: TeacherUser,
 ) -> MessageResponse:
     """Reorder modules in a course."""
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -512,7 +514,7 @@ async def reorder_course_modules(
         )
 
     try:
-        course_service.reorder_modules(course_id, data.items, UUID(str(user.id)))
+        await course_service.reorder_modules(course_id, data.items, UUID(str(user.id)))
         return MessageResponse(message="Modulos reordenados com sucesso")
     except CourseError as e:
         raise handle_course_error(e) from e
@@ -537,7 +539,7 @@ async def create_module(
     user: TeacherUser,
 ) -> ModuleResponse:
     """Create a new standalone module (TEACHER or ADMIN only)."""
-    module = module_service.create_module(data, UUID(str(user.id)))
+    module = await module_service.create_module(data, UUID(str(user.id)))
     return module_service.to_response(module)
 
 
@@ -553,12 +555,12 @@ async def list_modules(
     limit: int = 50,
 ) -> ModuleListResponse:
     """List all modules (TEACHER/ADMIN only)."""
-    modules = module_service.list_modules(status=status_filter, limit=limit)
-    items = [
-        module_service.to_response(m, module_service.get_lesson_count(m.id))
-        for m in modules
-        if can_view_content(user, m.status, m.creator_id)
-    ]
+    modules = await module_service.list_modules(status=status_filter, limit=limit)
+    items = []
+    for m in modules:
+        if can_view_content(user, m.status, m.creator_id):
+            lesson_count = await module_service.get_lesson_count(m.id)
+            items.append(module_service.to_response(m, lesson_count))
     return ModuleListResponse(
         items=items,
         total=len(items),
@@ -578,7 +580,7 @@ async def get_module(
     user: CurrentUser,
 ) -> ModuleDetailResponse:
     """Get module with nested lessons."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -592,7 +594,7 @@ async def get_module(
         )
 
     # Get lessons
-    lessons_with_pos = module_service.get_module_lessons(module_id)
+    lessons_with_pos = await module_service.get_module_lessons(module_id)
     lesson_responses = []
 
     for lesson, pos in lessons_with_pos:
@@ -646,7 +648,7 @@ async def update_module(
     user: TeacherUser,
 ) -> ModuleResponse:
     """Update module (owner or ADMIN only)."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -660,10 +662,9 @@ async def update_module(
         )
 
     try:
-        updated = module_service.update_module(module_id, data)
-        return module_service.to_response(
-            updated, module_service.get_lesson_count(module_id)
-        )
+        updated = await module_service.update_module(module_id, data)
+        lesson_count = await module_service.get_lesson_count(module_id)
+        return module_service.to_response(updated, lesson_count)
     except CourseError as e:
         raise handle_course_error(e) from e
 
@@ -686,7 +687,7 @@ async def delete_module(
         force: If True, unlink from all courses before deleting.
                Requires ADMIN role for force delete.
     """
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -707,7 +708,7 @@ async def delete_module(
         )
 
     try:
-        module_service.delete_module(module_id, force=force)
+        await module_service.delete_module(module_id, force=force)
     except ModuleInUseError as e:
         raise handle_course_error(e) from e
 
@@ -723,14 +724,14 @@ async def get_module_usage(
     user: TeacherUser,
 ) -> ModuleUsageResponse:
     """Get all courses that use this module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Modulo nao encontrado",
         )
 
-    courses = module_service.get_courses_using_module(module_id)
+    courses = await module_service.get_courses_using_module(module_id)
     course_refs = [
         {
             "id": c.id,
@@ -742,10 +743,9 @@ async def get_module_usage(
         if can_view_content(user, c.status, c.creator_id)
     ]
 
+    lesson_count = await module_service.get_lesson_count(module_id)
     return ModuleUsageResponse(
-        module=module_service.to_response(
-            module, module_service.get_lesson_count(module_id)
-        ),
+        module=module_service.to_response(module, lesson_count),
         courses=course_refs,
         course_count=len(course_refs),
     )
@@ -767,7 +767,7 @@ async def list_module_lessons(
     user: CurrentUser,
 ) -> list[LessonInModuleResponse]:
     """List all lessons in a module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -780,7 +780,7 @@ async def list_module_lessons(
             detail="Sem permissao para visualizar este modulo",
         )
 
-    lessons_with_pos = module_service.get_module_lessons(module_id)
+    lessons_with_pos = await module_service.get_module_lessons(module_id)
     responses = []
 
     for lesson, pos in lessons_with_pos:
@@ -823,7 +823,7 @@ async def link_lesson_to_module(
     user: TeacherUser,
 ) -> MessageResponse:
     """Link an existing lesson to a module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -837,7 +837,7 @@ async def link_lesson_to_module(
         )
 
     try:
-        module_service.link_lesson(
+        await module_service.link_lesson(
             module_id, data.lesson_id, data.position, UUID(str(user.id))
         )
         return MessageResponse(message="Aula vinculada com sucesso")
@@ -857,7 +857,7 @@ async def unlink_lesson_from_module(
     user: TeacherUser,
 ) -> None:
     """Unlink a lesson from a module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -871,7 +871,7 @@ async def unlink_lesson_from_module(
         )
 
     try:
-        module_service.unlink_lesson(module_id, lesson_id)
+        await module_service.unlink_lesson(module_id, lesson_id)
     except NotLinkedError as e:
         raise handle_course_error(e) from e
 
@@ -888,7 +888,7 @@ async def reorder_module_lessons(
     user: TeacherUser,
 ) -> MessageResponse:
     """Reorder lessons in a module."""
-    module = module_service.get_module(module_id)
+    module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -902,7 +902,7 @@ async def reorder_module_lessons(
         )
 
     try:
-        module_service.reorder_lessons(module_id, data.items, UUID(str(user.id)))
+        await module_service.reorder_lessons(module_id, data.items, UUID(str(user.id)))
         return MessageResponse(message="Aulas reordenadas com sucesso")
     except CourseError as e:
         raise handle_course_error(e) from e
@@ -927,7 +927,7 @@ async def create_lesson(
     user: TeacherUser,
 ) -> LessonResponse:
     """Create a new standalone lesson (TEACHER or ADMIN only)."""
-    lesson = lesson_service.create_lesson(data, UUID(str(user.id)))
+    lesson = await lesson_service.create_lesson(data, UUID(str(user.id)))
     return lesson_service.to_response(lesson)
 
 
@@ -944,7 +944,7 @@ async def list_lessons(
     limit: int = 50,
 ) -> LessonListResponse:
     """List all lessons (TEACHER/ADMIN only)."""
-    lessons = lesson_service.list_lessons(
+    lessons = await lesson_service.list_lessons(
         status=status_filter, content_type=content_type, limit=limit
     )
     items = [
@@ -970,7 +970,7 @@ async def get_lesson(
     user: CurrentUser,
 ) -> LessonResponse:
     """Get lesson details."""
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -998,7 +998,7 @@ async def update_lesson(
     user: TeacherUser,
 ) -> LessonResponse:
     """Update lesson (owner or ADMIN only)."""
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1012,7 +1012,7 @@ async def update_lesson(
         )
 
     try:
-        updated = lesson_service.update_lesson(lesson_id, data)
+        updated = await lesson_service.update_lesson(lesson_id, data)
         return lesson_service.to_response(updated)
     except CourseError as e:
         raise handle_course_error(e) from e
@@ -1036,7 +1036,7 @@ async def delete_lesson(
         force: If True, unlink from all modules before deleting.
                Requires ADMIN role for force delete.
     """
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1057,7 +1057,7 @@ async def delete_lesson(
         )
 
     try:
-        lesson_service.delete_lesson(lesson_id, force=force)
+        await lesson_service.delete_lesson(lesson_id, force=force)
     except LessonInUseError as e:
         raise handle_course_error(e) from e
 
@@ -1073,14 +1073,14 @@ async def get_lesson_usage(
     user: TeacherUser,
 ) -> LessonUsageResponse:
     """Get all modules that use this lesson."""
-    lesson = lesson_service.get_lesson(lesson_id)
+    lesson = await lesson_service.get_lesson(lesson_id)
     if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Aula nao encontrada",
         )
 
-    modules = lesson_service.get_modules_using_lesson(lesson_id)
+    modules = await lesson_service.get_modules_using_lesson(lesson_id)
     module_refs = [
         {
             "id": m.id,

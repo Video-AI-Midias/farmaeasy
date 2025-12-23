@@ -164,7 +164,7 @@ class ProgressService:
     # Enrollment Operations
     # ==========================================================================
 
-    def enroll_user(
+    async def enroll_user(
         self,
         user_id: UUID,
         course_id: UUID,
@@ -184,7 +184,7 @@ class ProgressService:
             AlreadyEnrolledError: If user already enrolled
         """
         # Check existing enrollment
-        existing = self.get_enrollment(user_id, course_id)
+        existing = await self.get_enrollment(user_id, course_id)
         if existing:
             raise AlreadyEnrolledError
 
@@ -198,7 +198,7 @@ class ProgressService:
         )
 
         # Dual write: main table + lookup table
-        self.session.execute(
+        await self.session.aexecute(
             self._upsert_enrollment,
             [
                 enrollment.course_id,
@@ -216,7 +216,7 @@ class ProgressService:
             ],
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._upsert_enrollment_by_user,
             [
                 enrollment.user_id,
@@ -238,15 +238,15 @@ class ProgressService:
 
         return enrollment
 
-    def get_enrollment(self, user_id: UUID, course_id: UUID) -> Enrollment | None:
+    async def get_enrollment(self, user_id: UUID, course_id: UUID) -> Enrollment | None:
         """Get enrollment by user and course."""
-        rows = self.session.execute(self._get_enrollment, [course_id, user_id])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_enrollment, [course_id, user_id])
+        row = result.one()
         return Enrollment.from_row(row) if row else None
 
-    def get_user_enrollments(self, user_id: UUID) -> list[Enrollment]:
+    async def get_user_enrollments(self, user_id: UUID) -> list[Enrollment]:
         """Get all enrollments for a user."""
-        rows = self.session.execute(self._get_user_enrollments, [user_id])
+        rows = await self.session.aexecute(self._get_user_enrollments, [user_id])
         # Build from lookup table (has same essential fields)
         return [
             Enrollment(
@@ -262,9 +262,9 @@ class ProgressService:
             for row in rows
         ]
 
-    def _update_enrollment(self, enrollment: Enrollment) -> None:
+    async def _update_enrollment(self, enrollment: Enrollment) -> None:
         """Update enrollment in both tables (dual-write)."""
-        self.session.execute(
+        await self.session.aexecute(
             self._upsert_enrollment,
             [
                 enrollment.course_id,
@@ -282,7 +282,7 @@ class ProgressService:
             ],
         )
 
-        self.session.execute(
+        await self.session.aexecute(
             self._upsert_enrollment_by_user,
             [
                 enrollment.user_id,
@@ -300,7 +300,7 @@ class ProgressService:
     # Video Progress Operations
     # ==========================================================================
 
-    def update_video_progress(
+    async def update_video_progress(
         self,
         user_id: UUID,
         lesson_id: UUID,
@@ -332,7 +332,9 @@ class ProgressService:
         duration_seconds = int(duration_seconds)
 
         # Get existing progress or create new
-        existing = self.get_lesson_progress(user_id, course_id, module_id, lesson_id)
+        existing = await self.get_lesson_progress(
+            user_id, course_id, module_id, lesson_id
+        )
 
         if existing:
             # Update only if position advanced (prevent backward updates)
@@ -404,19 +406,19 @@ class ProgressService:
             )
 
             # Ensure user is enrolled (auto-enroll on first progress)
-            enrollment = self.get_enrollment(user_id, course_id)
+            enrollment = await self.get_enrollment(user_id, course_id)
             if not enrollment:
-                self.enroll_user(user_id, course_id)
+                await self.enroll_user(user_id, course_id)
 
         # Save lesson progress
-        self._save_lesson_progress(progress)
+        await self._save_lesson_progress(progress)
 
         # Propagate to module and enrollment
-        self._propagate_progress(user_id, course_id, module_id, lesson_id)
+        await self._propagate_progress(user_id, course_id, module_id, lesson_id)
 
         return progress
 
-    def get_lesson_progress(
+    async def get_lesson_progress(
         self,
         user_id: UUID,
         course_id: UUID,
@@ -424,14 +426,14 @@ class ProgressService:
         lesson_id: UUID,
     ) -> LessonProgress | None:
         """Get progress for a specific lesson."""
-        rows = self.session.execute(
+        result = await self.session.aexecute(
             self._get_lesson_progress,
             [user_id, course_id, module_id, lesson_id],
         )
-        row = rows.one()
+        row = result.one()
         return LessonProgress.from_row(row) if row else None
 
-    def get_lesson_progress_check(
+    async def get_lesson_progress_check(
         self,
         user_id: UUID,
         course_id: UUID,
@@ -439,7 +441,9 @@ class ProgressService:
         lesson_id: UUID,
     ) -> LessonProgressCheckResponse:
         """Quick progress check for lesson load (UI resume feature)."""
-        progress = self.get_lesson_progress(user_id, course_id, module_id, lesson_id)
+        progress = await self.get_lesson_progress(
+            user_id, course_id, module_id, lesson_id
+        )
 
         if progress:
             return LessonProgressCheckResponse(
@@ -458,9 +462,9 @@ class ProgressService:
             status=LessonProgressStatus.NOT_STARTED,
         )
 
-    def _save_lesson_progress(self, progress: LessonProgress) -> None:
+    async def _save_lesson_progress(self, progress: LessonProgress) -> None:
         """Save lesson progress to database."""
-        self.session.execute(
+        await self.session.aexecute(
             self._upsert_lesson_progress,
             [
                 progress.user_id,
@@ -482,7 +486,7 @@ class ProgressService:
     # Manual Completion Operations
     # ==========================================================================
 
-    def mark_lesson_complete(
+    async def mark_lesson_complete(
         self,
         user_id: UUID,
         lesson_id: UUID,
@@ -492,7 +496,9 @@ class ProgressService:
         """Manually mark a lesson as complete (for non-video content)."""
         now = datetime.now(UTC)
 
-        existing = self.get_lesson_progress(user_id, course_id, module_id, lesson_id)
+        existing = await self.get_lesson_progress(
+            user_id, course_id, module_id, lesson_id
+        )
 
         if existing:
             progress = LessonProgress(
@@ -511,9 +517,9 @@ class ProgressService:
             )
         else:
             # Ensure enrolled
-            enrollment = self.get_enrollment(user_id, course_id)
+            enrollment = await self.get_enrollment(user_id, course_id)
             if not enrollment:
-                self.enroll_user(user_id, course_id)
+                await self.enroll_user(user_id, course_id)
 
             progress = LessonProgress(
                 user_id=user_id,
@@ -530,8 +536,8 @@ class ProgressService:
                 last_accessed_at=now,
             )
 
-        self._save_lesson_progress(progress)
-        self._propagate_progress(user_id, course_id, module_id, lesson_id)
+        await self._save_lesson_progress(progress)
+        await self._propagate_progress(user_id, course_id, module_id, lesson_id)
 
         logger.info(
             "lesson_marked_complete",
@@ -541,7 +547,7 @@ class ProgressService:
 
         return progress
 
-    def mark_lesson_incomplete(
+    async def mark_lesson_incomplete(
         self,
         user_id: UUID,
         lesson_id: UUID,
@@ -566,8 +572,8 @@ class ProgressService:
             last_accessed_at=now,
         )
 
-        self._save_lesson_progress(progress)
-        self._propagate_progress(user_id, course_id, module_id, lesson_id)
+        await self._save_lesson_progress(progress)
+        await self._propagate_progress(user_id, course_id, module_id, lesson_id)
 
         logger.info(
             "lesson_marked_incomplete",
@@ -581,7 +587,7 @@ class ProgressService:
     # Progress Aggregation
     # ==========================================================================
 
-    def _propagate_progress(
+    async def _propagate_progress(
         self,
         user_id: UUID,
         course_id: UUID,
@@ -593,7 +599,7 @@ class ProgressService:
         Recalculates module completion and overall course progress.
         """
         # Get all lesson progress for the course
-        all_progress = self._get_all_lesson_progress(user_id, course_id)
+        all_progress = await self._get_all_lesson_progress(user_id, course_id)
 
         # Group by module
         module_lessons: dict[UUID, list[LessonProgress]] = {}
@@ -626,7 +632,7 @@ class ProgressService:
             else:
                 mod_status = LessonProgressStatus.NOT_STARTED.value
 
-            self.session.execute(
+            await self.session.aexecute(
                 self._upsert_module_progress,
                 [
                     user_id,
@@ -641,7 +647,7 @@ class ProgressService:
             )
 
         # Update enrollment
-        enrollment = self.get_enrollment(user_id, course_id)
+        enrollment = await self.get_enrollment(user_id, course_id)
         if enrollment:
             course_progress = (
                 Decimal(str((total_completed / total_lessons) * 100))
@@ -671,15 +677,15 @@ class ProgressService:
             if enrollment.started_at is None:
                 enrollment.started_at = now
 
-            self._update_enrollment(enrollment)
+            await self._update_enrollment(enrollment)
 
-    def _get_all_lesson_progress(
+    async def _get_all_lesson_progress(
         self,
         user_id: UUID,
         course_id: UUID,
     ) -> list[LessonProgress]:
         """Get all lesson progress for a course."""
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_course_lesson_progress,
             [user_id, course_id],
         )
@@ -689,7 +695,7 @@ class ProgressService:
     # Course Progress Queries
     # ==========================================================================
 
-    def get_course_progress(
+    async def get_course_progress(
         self,
         user_id: UUID,
         course_id: UUID,
@@ -698,15 +704,15 @@ class ProgressService:
 
         Returns None if user is not enrolled.
         """
-        enrollment = self.get_enrollment(user_id, course_id)
+        enrollment = await self.get_enrollment(user_id, course_id)
         if not enrollment:
             return None
 
         # Get all lesson progress
-        lesson_progress = self._get_all_lesson_progress(user_id, course_id)
+        lesson_progress = await self._get_all_lesson_progress(user_id, course_id)
 
         # Get module progress
-        module_progress = self._get_all_module_progress(user_id, course_id)
+        module_progress = await self._get_all_module_progress(user_id, course_id)
 
         # Build response
         modules_map: dict[UUID, ModuleProgressSummary] = {}
@@ -790,37 +796,37 @@ class ProgressService:
             resume_position_seconds=resume_position,
         )
 
-    def _get_all_module_progress(
+    async def _get_all_module_progress(
         self,
         user_id: UUID,
         course_id: UUID,
     ) -> list[ModuleProgress]:
         """Get all module progress for a course."""
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_course_module_progress,
             [user_id, course_id],
         )
         return [ModuleProgress.from_row(row) for row in rows]
 
-    def get_module_progress(
+    async def get_module_progress(
         self,
         user_id: UUID,
         course_id: UUID,
         module_id: UUID,
     ) -> ModuleProgressResponse | None:
         """Get progress for a specific module."""
-        rows = self.session.execute(
+        result = await self.session.aexecute(
             self._get_module_progress,
             [user_id, course_id, module_id],
         )
-        row = rows.one()
+        row = result.one()
         return (
             ModuleProgressResponse.from_entity(ModuleProgress.from_row(row))
             if row
             else None
         )
 
-    def get_user_progress_summary(
+    async def get_user_progress_summary(
         self,
         user_id: UUID,
     ) -> dict:
@@ -835,7 +841,7 @@ class ProgressService:
             - last_lesson: Info about last accessed lesson
         """
         # Get all enrollments
-        enrollments = self.get_user_enrollments(user_id)
+        enrollments = await self.get_user_enrollments(user_id)
 
         total_courses = len(enrollments)
         total_completed = 0
@@ -855,7 +861,9 @@ class ProgressService:
             ):
                 last_accessed_at = enrollment.last_accessed_at
                 # Get full enrollment to get last_lesson_id and last_module_id
-                full_enrollment = self.get_enrollment(user_id, enrollment.course_id)
+                full_enrollment = await self.get_enrollment(
+                    user_id, enrollment.course_id
+                )
                 if full_enrollment:
                     last_lesson_info = {
                         "course_id": enrollment.course_id,
@@ -865,7 +873,9 @@ class ProgressService:
                     }
 
             # Sum watch time from lesson progress
-            all_lessons = self._get_all_lesson_progress(user_id, enrollment.course_id)
+            all_lessons = await self._get_all_lesson_progress(
+                user_id, enrollment.course_id
+            )
             for lesson in all_lessons:
                 total_watch_time += lesson.duration_watched_seconds or 0
 

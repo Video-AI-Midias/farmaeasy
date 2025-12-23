@@ -214,35 +214,35 @@ class AuthService:
     # User Operations
     # ==========================================================================
 
-    def get_user_by_email(self, email: str) -> User | None:
+    async def get_user_by_email(self, email: str) -> User | None:
         """Find user by email address."""
-        rows = self.session.execute(self._get_user_by_email, [email.lower()])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_user_by_email, [email.lower()])
+        row = result.one()
         return User.from_row(row) if row else None
 
-    def get_user_by_cpf(self, cpf: str) -> User | None:
+    async def get_user_by_cpf(self, cpf: str) -> User | None:
         """Find user by CPF."""
-        rows = self.session.execute(self._get_user_by_cpf, [cpf])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_user_by_cpf, [cpf])
+        row = result.one()
         return User.from_row(row) if row else None
 
-    def get_user_by_id(self, user_id: UUID) -> User | None:
+    async def get_user_by_id(self, user_id: UUID) -> User | None:
         """Find user by ID."""
-        rows = self.session.execute(self._get_user_by_id, [user_id])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_user_by_id, [user_id])
+        row = result.one()
         return User.from_row(row) if row else None
 
-    def get_user_by_name(self, name: str) -> User | None:
+    async def get_user_by_name(self, name: str) -> User | None:
         """Find user by name (exact match).
 
         Used for @mention resolution in comments.
         Returns the first matching user if multiple exist with same name.
         """
-        rows = self.session.execute(self._get_user_by_name, [name])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_user_by_name, [name])
+        row = result.one()
         return User.from_row(row) if row else None
 
-    def register_user(self, data: RegisterRequest) -> User:
+    async def register_user(self, data: RegisterRequest) -> User:
         """Register a new user.
 
         Args:
@@ -255,11 +255,11 @@ class AuthService:
             UserExistsError: If email or CPF already exists
         """
         # Check email uniqueness
-        if self.get_user_by_email(data.email):
+        if await self.get_user_by_email(data.email):
             raise UserExistsError("Email ja cadastrado", field="email")
 
         # Check CPF uniqueness (if provided)
-        if data.cpf and self.get_user_by_cpf(data.cpf):
+        if data.cpf and await self.get_user_by_cpf(data.cpf):
             raise UserExistsError("CPF ja cadastrado", field="cpf")
 
         # Create user
@@ -273,10 +273,10 @@ class AuthService:
             is_active=True,
         )
 
-        self._insert_user_to_db(user)
+        await self._insert_user_to_db(user)
         return user
 
-    def admin_create_user(self, data: AdminCreateUserRequest) -> User:
+    async def admin_create_user(self, data: AdminCreateUserRequest) -> User:
         """Create a new user (admin only).
 
         Args:
@@ -289,11 +289,11 @@ class AuthService:
             UserExistsError: If email or CPF already exists
         """
         # Check email uniqueness
-        if self.get_user_by_email(data.email):
+        if await self.get_user_by_email(data.email):
             raise UserExistsError("Email ja cadastrado", field="email")
 
         # Check CPF uniqueness (if provided)
-        if data.cpf and self.get_user_by_cpf(data.cpf):
+        if data.cpf and await self.get_user_by_cpf(data.cpf):
             raise UserExistsError("CPF ja cadastrado", field="cpf")
 
         # Extract address fields
@@ -326,12 +326,12 @@ class AuthService:
             address_zip_code=address_zip_code,
         )
 
-        self._insert_user_to_db(user)
+        await self._insert_user_to_db(user)
         return user
 
-    def _insert_user_to_db(self, user: User) -> None:
+    async def _insert_user_to_db(self, user: User) -> None:
         """Insert user into database."""
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_user,
             [
                 user.id,
@@ -356,7 +356,7 @@ class AuthService:
             ],
         )
 
-    def authenticate_user(self, email: str, password: str) -> User:
+    async def authenticate_user(self, email: str, password: str) -> User:
         """Authenticate user with email and password.
 
         Args:
@@ -370,7 +370,7 @@ class AuthService:
             InvalidCredentialsError: If email or password is wrong
             UserInactiveError: If user account is inactive
         """
-        user = self.get_user_by_email(email)
+        user = await self.get_user_by_email(email)
         if not user:
             raise InvalidCredentialsError
 
@@ -383,7 +383,7 @@ class AuthService:
 
         # Update hash if needed (algorithm params changed)
         if new_hash:
-            self.session.execute(
+            await self.session.aexecute(
                 self._update_user_password,
                 [new_hash, datetime.now(UTC), user.id],
             )
@@ -391,7 +391,7 @@ class AuthService:
 
         return user
 
-    def update_user_profile(
+    async def update_user_profile(
         self,
         user_id: UUID,
         name: str | None = None,
@@ -412,7 +412,7 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
@@ -426,14 +426,14 @@ class AuthService:
 
         user.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user,
             [user.name, user.phone, user.avatar_url, user.updated_at, user.id],
         )
 
         return user
 
-    def change_password(
+    async def change_password(
         self,
         user_id: UUID,
         current_password: str,
@@ -450,7 +450,7 @@ class AuthService:
             UserNotFoundError: If user doesn't exist
             InvalidCredentialsError: If current password is wrong
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
@@ -459,12 +459,12 @@ class AuthService:
             raise InvalidCredentialsError("Senha atual incorreta")
 
         new_hash = hash_password(new_password)
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user_password,
             [new_hash, datetime.now(UTC), user.id],
         )
 
-    def reset_password(self, user_id: UUID, new_password: str) -> None:
+    async def reset_password(self, user_id: UUID, new_password: str) -> None:
         """Reset user password (for password recovery).
 
         Unlike change_password, this doesn't require the current password.
@@ -477,17 +477,17 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
         new_hash = hash_password(new_password)
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user_password,
             [new_hash, datetime.now(UTC), user.id],
         )
 
-    def update_user_email(self, user_id: UUID, new_email: str) -> User:
+    async def update_user_email(self, user_id: UUID, new_email: str) -> User:
         """Update user email address.
 
         Use only after verifying the new email through verification code.
@@ -502,14 +502,14 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
         user.email = new_email.lower()
         user.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user_email,
             [user.email, user.updated_at, user.id],
         )
@@ -531,7 +531,7 @@ class AuthService:
         is_valid, _ = verify_password(password, password_hash)
         return is_valid
 
-    def update_user_role(self, user_id: UUID, new_role: UserRole) -> User:
+    async def update_user_role(self, user_id: UUID, new_role: UserRole) -> User:
         """Update user role (admin only).
 
         Args:
@@ -544,21 +544,21 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
         user.role = new_role.value
         user.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user_role,
             [user.role, user.updated_at, user.id],
         )
 
         return user
 
-    def deactivate_user(self, user_id: UUID) -> None:
+    async def deactivate_user(self, user_id: UUID) -> None:
         """Deactivate user account.
 
         Args:
@@ -567,16 +567,16 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
-        self.session.execute(
+        await self.session.aexecute(
             self._deactivate_user,
             [False, datetime.now(UTC), user_id],
         )
 
-    def update_user_max_sessions(
+    async def update_user_max_sessions(
         self,
         user_id: UUID,
         max_sessions: int | None,
@@ -593,14 +593,14 @@ class AuthService:
         Raises:
             UserNotFoundError: If user doesn't exist
         """
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError
 
         user.max_concurrent_sessions = max_sessions
         user.updated_at = datetime.now(UTC)
 
-        self.session.execute(
+        await self.session.aexecute(
             self._update_user_max_sessions,
             [max_sessions, user.updated_at, user_id],
         )
@@ -611,7 +611,7 @@ class AuthService:
     # Session Management
     # ==========================================================================
 
-    def count_active_sessions(self, user_id: UUID) -> int:
+    async def count_active_sessions(self, user_id: UUID) -> int:
         """Count active (non-revoked, non-expired) sessions for a user.
 
         Args:
@@ -620,7 +620,7 @@ class AuthService:
         Returns:
             Number of active sessions
         """
-        rows = self.session.execute(self._get_tokens_by_user, [user_id])
+        rows = await self.session.aexecute(self._get_tokens_by_user, [user_id])
         now = datetime.now(UTC)
         count = 0
 
@@ -651,7 +651,7 @@ class AuthService:
             return user.max_concurrent_sessions
         return get_settings().auth_default_max_concurrent_sessions
 
-    def check_session_limit(self, user: User) -> None:
+    async def check_session_limit(self, user: User) -> None:
         """Check if user can create a new session.
 
         Args:
@@ -661,7 +661,7 @@ class AuthService:
             SessionLimitExceededError: If limit is exceeded
         """
         max_sessions = self.get_user_max_sessions(user)
-        current_sessions = self.count_active_sessions(user.id)
+        current_sessions = await self.count_active_sessions(user.id)
 
         if current_sessions >= max_sessions:
             raise SessionLimitExceededError(
@@ -669,7 +669,7 @@ class AuthService:
                 max_sessions=max_sessions,
             )
 
-    def get_session_access_times(
+    async def get_session_access_times(
         self, user_id: UUID
     ) -> tuple[datetime | None, datetime | None]:
         """Get first and last access times for a user based on refresh tokens.
@@ -680,7 +680,7 @@ class AuthService:
         Returns:
             Tuple of (first_access, last_access) datetimes
         """
-        rows = self.session.execute(self._get_tokens_by_user, [user_id])
+        rows = await self.session.aexecute(self._get_tokens_by_user, [user_id])
         first_access: datetime | None = None
         last_access: datetime | None = None
 
@@ -702,7 +702,7 @@ class AuthService:
     # Token Operations
     # ==========================================================================
 
-    def create_tokens(
+    async def create_tokens(
         self,
         user: User,
         user_agent: str | None = None,
@@ -725,7 +725,7 @@ class AuthService:
         """
         # Check session limit before creating new token
         if check_session_limit:
-            self.check_session_limit(user)
+            await self.check_session_limit(user)
 
         settings = get_settings()
 
@@ -751,7 +751,7 @@ class AuthService:
         now = datetime.now(UTC)
 
         # Main table (query by jti)
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_token,
             [
                 UUID(jti),
@@ -766,14 +766,14 @@ class AuthService:
         )
 
         # Lookup table (query by user_id)
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_token_by_user,
             [user.id, UUID(jti), expires_at, False, now],
         )
 
         return access_token, refresh_token
 
-    def refresh_tokens(
+    async def refresh_tokens(
         self,
         refresh_token: str,
         user_agent: str | None = None,
@@ -805,8 +805,8 @@ class AuthService:
         user_id = UUID(payload["sub"])
 
         # Check token in database
-        rows = self.session.execute(self._get_token_by_jti, [jti])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_token_by_jti, [jti])
+        row = result.one()
         if not row:
             raise InvalidTokenError
 
@@ -816,22 +816,22 @@ class AuthService:
 
         # Revoke old token (rotation)
         now = datetime.now(UTC)
-        self.session.execute(self._revoke_token, [now, jti])
-        self.session.execute(self._revoke_token_by_user, [user_id, jti])
+        await self.session.aexecute(self._revoke_token, [now, jti])
+        await self.session.aexecute(self._revoke_token_by_user, [user_id, jti])
 
         # Get user and verify active
-        user = self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             raise InvalidTokenError
         if not user.is_active:
             raise UserInactiveError
 
         # Create new tokens (skip session limit check - this is a token rotation, not a new session)
-        return self.create_tokens(
+        return await self.create_tokens(
             user, user_agent, ip_address, check_session_limit=False
         )
 
-    def revoke_token(self, refresh_token: str) -> None:
+    async def revoke_token(self, refresh_token: str) -> None:
         """Revoke a specific refresh token.
 
         Args:
@@ -849,10 +849,10 @@ class AuthService:
         user_id = UUID(payload["sub"])
 
         now = datetime.now(UTC)
-        self.session.execute(self._revoke_token, [now, jti])
-        self.session.execute(self._revoke_token_by_user, [user_id, jti])
+        await self.session.aexecute(self._revoke_token, [now, jti])
+        await self.session.aexecute(self._revoke_token_by_user, [user_id, jti])
 
-    def revoke_all_user_tokens(self, user_id: UUID) -> int:
+    async def revoke_all_user_tokens(self, user_id: UUID) -> int:
         """Revoke all refresh tokens for a user (logout from all devices).
 
         Args:
@@ -861,38 +861,40 @@ class AuthService:
         Returns:
             Number of tokens revoked
         """
-        rows = self.session.execute(self._get_tokens_by_user, [user_id])
+        rows = await self.session.aexecute(self._get_tokens_by_user, [user_id])
         count = 0
         now = datetime.now(UTC)
 
         for row in rows:
             token = RefreshTokenByUser.from_row(row)
             if not token.revoked:
-                self.session.execute(self._revoke_token, [now, token.jti])
-                self.session.execute(self._revoke_token_by_user, [user_id, token.jti])
+                await self.session.aexecute(self._revoke_token, [now, token.jti])
+                await self.session.aexecute(
+                    self._revoke_token_by_user, [user_id, token.jti]
+                )
                 count += 1
 
         return count
 
-    def get_token_by_jti(self, jti: UUID) -> RefreshToken | None:
+    async def get_token_by_jti(self, jti: UUID) -> RefreshToken | None:
         """Get refresh token by JTI."""
-        rows = self.session.execute(self._get_token_by_jti, [jti])
-        row = rows.one()
+        result = await self.session.aexecute(self._get_token_by_jti, [jti])
+        row = result.one()
         return RefreshToken.from_row(row) if row else None
 
     # ==========================================================================
     # Validation Operations
     # ==========================================================================
 
-    def is_email_available(self, email: str) -> bool:
+    async def is_email_available(self, email: str) -> bool:
         """Check if email is available for registration."""
-        return self.get_user_by_email(email) is None
+        return await self.get_user_by_email(email) is None
 
-    def is_cpf_available(self, cpf: str) -> bool:
+    async def is_cpf_available(self, cpf: str) -> bool:
         """Check if CPF is available for registration."""
-        return self.get_user_by_cpf(cpf) is None
+        return await self.get_user_by_cpf(cpf) is None
 
-    def list_active_users(self) -> list[User]:
+    async def list_active_users(self) -> list[User]:
         """List all active users for admin operations.
 
         Note: Uses ALLOW FILTERING which is OK for admin-only, low-frequency operations.
@@ -902,12 +904,12 @@ class AuthService:
             List of active User instances
         """
         # Direct query with ALLOW FILTERING (safe for admin use)
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             f"SELECT * FROM {self.keyspace}.users WHERE is_active = true ALLOW FILTERING"
         )
         return [User.from_row(row) for row in rows]
 
-    def list_users_by_role(self, role: UserRole) -> list[User]:
+    async def list_users_by_role(self, role: UserRole) -> list[User]:
         """List all active users with specific role.
 
         Args:
@@ -916,10 +918,10 @@ class AuthService:
         Returns:
             List of User instances with the specified role
         """
-        rows = self.session.execute(self._list_users_by_role, [role.value])
+        rows = await self.session.aexecute(self._list_users_by_role, [role.value])
         return [User.from_row(row) for row in rows]
 
-    def search_users(
+    async def search_users(
         self,
         search: str | None = None,
         role: UserRole | None = None,
@@ -936,7 +938,10 @@ class AuthService:
             List of matching User instances
         """
         # Get base list filtered by role if specified
-        users = self.list_users_by_role(role) if role else self.list_active_users()
+        if role:
+            users = await self.list_users_by_role(role)
+        else:
+            users = await self.list_active_users()
 
         # Apply search filter in memory (Cassandra doesn't support LIKE efficiently)
         if search:

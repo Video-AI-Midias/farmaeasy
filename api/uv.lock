@@ -170,6 +170,18 @@ wheels = [
 ]
 
 [[package]]
+name = "cassandra-asyncio-driver"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cassandra-driver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/bd/93224e93a6c5511d68c19b94fdcc096a2e2031f61d44b126348c8ffb7566/cassandra_asyncio_driver-0.1.4.tar.gz", hash = "sha256:495706a8d01ff8e64bcd579acf3ef65cfc177b0b04227cd608c9823c172f25dd", size = 3401, upload-time = "2024-12-06T07:09:06.641Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/5d/dd76178a8bc4cf4a54a545b302ba259229dba9c15a8fb706c484d2537c31/cassandra_asyncio_driver-0.1.4-py3-none-any.whl", hash = "sha256:82fb8beb3e74cb35eb8f367f743a9518f70d74547f82b768a70bbc1c05dd3a1b", size = 3852, upload-time = "2024-12-06T07:09:05.559Z" },
+]
+
+[[package]]
 name = "cassandra-driver"
 version = "3.29.3"
 source = { registry = "https://pypi.org/simple" }
@@ -557,6 +569,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },
+    { name = "cassandra-asyncio-driver" },
     { name = "cassandra-driver" },
     { name = "cryptography" },
     { name = "email-validator" },
@@ -611,6 +624,7 @@ dev = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=23.1.0" },
     { name = "asgi-lifespan", marker = "extra == 'dev'", specifier = ">=2.1.0" },
+    { name = "cassandra-asyncio-driver", specifier = ">=0.1.4" },
     { name = "cassandra-driver", specifier = ">=3.29.0" },
     { name = "cryptography", specifier = ">=46.0.3" },
     { name = "email-validator", specifier = ">=2.1.0" },

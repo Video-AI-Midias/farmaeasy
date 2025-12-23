@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     cassandra_password: str | None = Field(
         default=None, description="Cassandra password"
     )
-    cassandra_protocol_version: int = Field(default=4, description="Protocol version")
+    cassandra_protocol_version: int = Field(default=5, description="Protocol version")
     cassandra_connect_timeout: float = Field(
         default=10.0, description="Connect timeout"
     )

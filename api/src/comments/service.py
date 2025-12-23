@@ -11,7 +11,6 @@ import hashlib
 import html
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -46,10 +45,6 @@ from .schemas import (
 if TYPE_CHECKING:
     from cassandra.cluster import Session
     from redis.asyncio import Redis
-
-
-# Thread pool for blocking Cassandra operations
-_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="cassandra_")
 
 
 # ==============================================================================
@@ -365,6 +360,34 @@ class CommentService:
             WHERE comment_id = ? AND report_id = ?
         """)
 
+        # User blocks
+        self._check_user_blocked = self.session.prepare(f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ?
+            ORDER BY blocked_at DESC
+            LIMIT 1
+        """)
+
+        self._get_user_block = self.session.prepare(f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ? AND block_id = ?
+            LIMIT 1
+            ALLOW FILTERING
+        """)
+
+        self._update_user_block_expires = self.session.prepare(f"""
+            UPDATE {self.keyspace}.user_comment_blocks
+            SET expires_at = ?
+            WHERE user_id = ? AND blocked_at = ? AND block_id = ?
+        """)
+
+        self._get_user_blocks = self.session.prepare(f"""
+            SELECT * FROM {self.keyspace}.user_comment_blocks
+            WHERE user_id = ?
+            ORDER BY blocked_at DESC
+            LIMIT ?
+        """)
+
     # ==========================================================================
     # Rate Limiting (Redis-based)
     # ==========================================================================
@@ -486,7 +509,7 @@ class CommentService:
         )
 
         # Insert to main table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_comment,
             [
                 comment.lesson_id,
@@ -511,25 +534,26 @@ class CommentService:
             ],
         )
 
-        # Insert to by_parent table for efficient reply queries
-        self.session.execute(
-            self._insert_comment_by_parent,
-            [
-                comment.lesson_id,
-                comment.parent_id,
-                comment.comment_id,
-                comment.author_id,
-                comment.author_name,
-                comment.author_avatar,
-                comment.content,
-                comment.is_edited,
-                comment.is_deleted,
-                comment.reply_count,
-                comment.rating,
-                comment.is_review,
-                comment.created_at,
-            ],
-        )
+        # Insert to by_parent table for efficient reply queries (only for replies)
+        if parent_id:
+            await self.session.aexecute(
+                self._insert_comment_by_parent,
+                [
+                    comment.lesson_id,
+                    comment.parent_id,
+                    comment.comment_id,
+                    comment.author_id,
+                    comment.author_name,
+                    comment.author_avatar,
+                    comment.content,
+                    comment.is_edited,
+                    comment.is_deleted,
+                    comment.reply_count,
+                    comment.rating,
+                    comment.is_review,
+                    comment.created_at,
+                ],
+            )
 
         # Update parent reply count if this is a reply
         if parent_id:
@@ -549,10 +573,10 @@ class CommentService:
         Finds the parent comment, gets its current reply_count,
         and increments it by 1.
         """
-        parent = self.find_comment_by_id(lesson_id, parent_id)
+        parent = await self.find_comment_by_id(lesson_id, parent_id)
         if parent:
             new_count = parent.reply_count + 1
-            self.session.execute(
+            await self.session.aexecute(
                 self._update_reply_count,
                 [new_count, lesson_id, parent.created_at, parent_id],
             )
@@ -563,15 +587,15 @@ class CommentService:
         Finds the parent comment, gets its current reply_count,
         and decrements it by 1 (minimum 0).
         """
-        parent = self.find_comment_by_id(lesson_id, parent_id)
+        parent = await self.find_comment_by_id(lesson_id, parent_id)
         if parent:
             new_count = max(0, parent.reply_count - 1)
-            self.session.execute(
+            await self.session.aexecute(
                 self._update_reply_count,
                 [new_count, lesson_id, parent.created_at, parent_id],
             )
 
-    def count_replies(self, lesson_id: UUID, comment_id: UUID) -> int:
+    async def count_replies(self, lesson_id: UUID, comment_id: UUID) -> int:
         """Count actual replies for a comment from comments_by_parent table.
 
         This is more reliable than the denormalized reply_count field,
@@ -584,13 +608,14 @@ class CommentService:
         Returns:
             Number of replies
         """
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._count_replies,
             [lesson_id, comment_id],
-        ).one()
+        )
+        row = result.one()
         return row.count if row else 0
 
-    def count_comments_by_author(self, author_id: UUID) -> int:
+    async def count_comments_by_author(self, author_id: UUID) -> int:
         """Count total comments by a specific author.
 
         Uses the secondary index on author_id.
@@ -602,13 +627,16 @@ class CommentService:
         Returns:
             Number of comments by the author
         """
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._count_comments_by_author,
             [author_id],
-        ).one()
+        )
+        row = result.one()
         return row.count if row else 0
 
-    def find_comment_by_id(self, lesson_id: UUID, comment_id: UUID) -> Comment | None:
+    async def find_comment_by_id(
+        self, lesson_id: UUID, comment_id: UUID
+    ) -> Comment | None:
         """Find a comment by ID within a lesson.
 
         Used for notification lookups (parent comment author, etc).
@@ -627,7 +655,7 @@ class CommentService:
         # Search through more comments to handle lessons with many replies
         # The query is ordered by created_at DESC, so older parent comments
         # may be far down in the results
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_comments_by_lesson,
             [lesson_id, 2000],
         )
@@ -657,12 +685,12 @@ class CommentService:
         # Query with or without cursor
         if cursor:
             created_at, _comment_id = decode_cursor(cursor)
-            rows = self.session.execute(
+            rows = await self.session.aexecute(
                 self._get_comments_by_lesson_cursor,
                 [lesson_id, created_at, limit + 1],
             )
         else:
-            rows = self.session.execute(
+            rows = await self.session.aexecute(
                 self._get_comments_by_lesson,
                 [lesson_id, limit + 1],
             )
@@ -690,7 +718,7 @@ class CommentService:
                 )
             # Use actual reply count from comments_by_parent table
             # This ensures correct count even for existing data
-            actual_reply_count = self.count_replies(
+            actual_reply_count = await self.count_replies(
                 comment.lesson_id, comment.comment_id
             )
             comment_responses.append(
@@ -706,10 +734,11 @@ class CommentService:
             next_cursor = encode_cursor(last.created_at, last.comment_id)
 
         # Get total count
-        count_row = self.session.execute(
+        result = await self.session.aexecute(
             self._count_comments_by_lesson,
             [lesson_id],
-        ).one()
+        )
+        count_row = result.one()
         total = count_row.count if count_row else 0
 
         response = CommentListResponse(
@@ -733,7 +762,7 @@ class CommentService:
         user_id: UUID | None = None,
     ) -> list[CommentResponse]:
         """Get replies to a specific comment."""
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_replies,
             [lesson_id, parent_id, limit],
         )
@@ -750,7 +779,7 @@ class CommentService:
                     )
 
                 # Get actual reply count from comments_by_parent table
-                actual_reply_count = self.count_replies(
+                actual_reply_count = await self.count_replies(
                     comment.lesson_id, comment.comment_id
                 )
 
@@ -795,10 +824,11 @@ class CommentService:
         - Edit window (24 hours)
         """
         # Fetch existing comment
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_comment,
             [lesson_id, created_at, comment_id],
-        ).one()
+        )
+        row = result.one()
 
         if not row:
             raise CommentNotFoundError
@@ -835,7 +865,7 @@ class CommentService:
         now = datetime.now(UTC)
 
         # Update in database
-        self.session.execute(
+        await self.session.aexecute(
             self._update_comment,
             [
                 safe_content,
@@ -876,10 +906,11 @@ class CommentService:
         Moderators can delete any comment with a reason.
         """
         # Fetch existing comment
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_comment,
             [lesson_id, created_at, comment_id],
-        ).one()
+        )
+        row = result.one()
 
         if not row:
             raise CommentNotFoundError
@@ -900,7 +931,7 @@ class CommentService:
         deleted_by = user_id if is_moderator else None
 
         # Soft delete
-        self.session.execute(
+        await self.session.aexecute(
             self._soft_delete_comment,
             [
                 now,
@@ -945,23 +976,25 @@ class CommentService:
                 return await self.remove_reaction(comment_id, user_id)
 
             # Different reaction - remove old, add new
-            self.session.execute(self._delete_reaction, [comment_id, user_id])
-            self.session.execute(self._delete_user_reaction, [user_id, comment_id])
-            self.session.execute(
+            await self.session.aexecute(self._delete_reaction, [comment_id, user_id])
+            await self.session.aexecute(
+                self._delete_user_reaction, [user_id, comment_id]
+            )
+            await self.session.aexecute(
                 self._decr_reaction_count,
                 [comment_id, existing],
             )
 
         # Add new reaction
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_reaction,
             [comment_id, user_id, reaction_type.value, now],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_user_reaction,
             [user_id, comment_id, reaction_type.value, now],
         )
-        self.session.execute(
+        await self.session.aexecute(
             self._incr_reaction_count,
             [comment_id, reaction_type.value],
         )
@@ -979,9 +1012,11 @@ class CommentService:
         existing = await self.get_user_reaction(comment_id, user_id)
 
         if existing:
-            self.session.execute(self._delete_reaction, [comment_id, user_id])
-            self.session.execute(self._delete_user_reaction, [user_id, comment_id])
-            self.session.execute(
+            await self.session.aexecute(self._delete_reaction, [comment_id, user_id])
+            await self.session.aexecute(
+                self._delete_user_reaction, [user_id, comment_id]
+            )
+            await self.session.aexecute(
                 self._decr_reaction_count,
                 [comment_id, existing],
             )
@@ -994,10 +1029,11 @@ class CommentService:
         user_id: UUID,
     ) -> str | None:
         """Get user's reaction to a comment, if any."""
-        row = self.session.execute(
+        result = await self.session.aexecute(
             self._get_user_reaction,
             [user_id, comment_id],
-        ).one()
+        )
+        row = result.one()
 
         return row.reaction_type if row else None
 
@@ -1014,7 +1050,7 @@ class CommentService:
                 }
 
         # Query from DB
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_reaction_counts,
             [comment_id],
         )
@@ -1065,7 +1101,7 @@ class CommentService:
         )
 
         # Insert to main table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_report,
             [
                 report.report_id,
@@ -1083,7 +1119,7 @@ class CommentService:
         )
 
         # Insert to status lookup table
-        self.session.execute(
+        await self.session.aexecute(
             self._insert_report_by_status,
             [
                 report.status.value,
@@ -1100,7 +1136,7 @@ class CommentService:
 
     async def get_pending_reports(self, limit: int = 50) -> list[CommentReport]:
         """Get pending reports for moderation."""
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_reports_by_status,
             [ReportStatus.PENDING.value, limit],
         )
@@ -1131,7 +1167,7 @@ class CommentService:
             status = ReportStatus.ACTION_TAKEN
 
         # Update report
-        self.session.execute(
+        await self.session.aexecute(
             self._update_report,
             [
                 status.value,
@@ -1166,7 +1202,7 @@ class CommentService:
                 return RatingStatsResponse(**data)
 
         # Query all comments with ratings for this lesson
-        rows = self.session.execute(
+        rows = await self.session.aexecute(
             self._get_comments_by_lesson,
             [lesson_id, 1000],  # Get up to 1000 comments
         )
@@ -1307,16 +1343,16 @@ class CommentService:
             duration_days=duration_days,
         )
 
-        # Insert into user_comment_blocks table
+        # Insert into user_comment_blocks table (async)
         insert_block = f"""
             INSERT INTO {self.keyspace}.user_comment_blocks
             (user_id, block_id, blocked_at, blocked_by, reason, moderator_notes,
              expires_at, is_permanent)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
-        await self.session.execute_async(
+        await self.session.aexecute(
             insert_block,
-            (
+            [
                 block.user_id,
                 block.block_id,
                 block.blocked_at,
@@ -1325,25 +1361,25 @@ class CommentService:
                 block.moderator_notes,
                 block.expires_at,
                 block.is_permanent,
-            ),
+            ],
         )
 
-        # Insert into moderator activity log
+        # Insert into moderator activity log (async)
         insert_log = f"""
             INSERT INTO {self.keyspace}.comment_blocks_by_moderator
             (moderator_id, block_id, user_id, blocked_at, reason, is_permanent)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        await self.session.execute_async(
+        await self.session.aexecute(
             insert_log,
-            (
+            [
                 moderator_id,
                 block.block_id,
                 user_id,
                 block.blocked_at,
                 reason,
                 block.is_permanent,
-            ),
+            ],
         )
 
         # Create audit log for compliance
@@ -1355,15 +1391,15 @@ class CommentService:
             details=f"Reason: {reason}, Duration: {'Permanent' if block.is_permanent else f'{duration_days} days'}",
         )
 
-        # Insert audit log
+        # Insert audit log (async)
         insert_audit = f"""
             INSERT INTO {self.keyspace}.moderator_audit_log
             (log_id, moderator_id, action, target_user_id, target_id, performed_at, details, ip_address, user_agent)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        await self.session.execute_async(
+        await self.session.aexecute(
             insert_audit,
-            (
+            [
                 audit_log.log_id,
                 audit_log.moderator_id,
                 audit_log.action.value,
@@ -1373,7 +1409,7 @@ class CommentService:
                 audit_log.details,
                 audit_log.ip_address,
                 audit_log.user_agent,
-            ),
+            ],
         )
 
         return UserBlockResponse.from_block(block)
@@ -1396,28 +1432,18 @@ class CommentService:
         Returns:
             True if block was found and updated, False otherwise
         """
-        # Check if block exists
-        query = f"""
-            SELECT * FROM {self.keyspace}.user_comment_blocks
-            WHERE user_id = ? AND block_id = ?
-            LIMIT 1
-        """
-        result = await self.session.execute_async(query, (user_id, block_id))
+        # Check if block exists using prepared statement (async)
+        result = await self.session.aexecute(self._get_user_block, [user_id, block_id])
         row = result.one()
 
         if not row:
             return False
 
-        # Update block to expire now
-        update_block = f"""
-            UPDATE {self.keyspace}.user_comment_blocks
-            SET expires_at = ?
-            WHERE user_id = ? AND blocked_at = ? AND block_id = ?
-        """
+        # Update block to expire now using prepared statement (async)
         now = datetime.now(UTC)
-        await self.session.execute_async(
-            update_block,
-            (now, user_id, row.blocked_at, block_id),
+        await self.session.aexecute(
+            self._update_user_block_expires,
+            [now, user_id, row.blocked_at, block_id],
         )
 
         # Create audit log for compliance
@@ -1429,15 +1455,15 @@ class CommentService:
             details=notes or "Block removed manually",
         )
 
-        # Insert audit log
+        # Insert audit log (async)
         insert_audit = f"""
             INSERT INTO {self.keyspace}.moderator_audit_log
             (log_id, moderator_id, action, target_user_id, target_id, performed_at, details, ip_address, user_agent)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        await self.session.execute_async(
+        await self.session.aexecute(
             insert_audit,
-            (
+            [
                 audit_log.log_id,
                 audit_log.moderator_id,
                 audit_log.action.value,
@@ -1447,7 +1473,7 @@ class CommentService:
                 audit_log.details,
                 audit_log.ip_address,
                 audit_log.user_agent,
-            ),
+            ],
         )
 
         return True
@@ -1461,14 +1487,8 @@ class CommentService:
         Returns:
             True if user has an active block, False otherwise
         """
-        # Get most recent block for user
-        query = f"""
-            SELECT * FROM {self.keyspace}.user_comment_blocks
-            WHERE user_id = ?
-            ORDER BY blocked_at DESC
-            LIMIT 1
-        """
-        result = await self.session.execute_async(query, (user_id,))
+        # Get most recent block for user using prepared statement (async)
+        result = await self.session.aexecute(self._check_user_blocked, [user_id])
         row = result.one()
 
         if not row:
@@ -1494,13 +1514,10 @@ class CommentService:
         Returns:
             UserBlockListResponse with list of blocks
         """
-        query = f"""
-            SELECT * FROM {self.keyspace}.user_comment_blocks
-            WHERE user_id = ?
-            ORDER BY blocked_at DESC
-            LIMIT ?
-        """
-        result = await self.session.execute_async(query, (user_id, limit + 1))
+        # Use prepared statement for user blocks query (async)
+        result = await self.session.aexecute(
+            self._get_user_blocks, [user_id, limit + 1]
+        )
         rows = result.all()
 
         # Convert to entities

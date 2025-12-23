@@ -94,7 +94,7 @@ async def create_comment(
                 # Process @mentions and create notifications
                 async def user_lookup(name: str):
                     """Lookup user by name for @mention resolution."""
-                    return auth_service.get_user_by_name(name)
+                    return await auth_service.get_user_by_name(name)
 
                 await notification_service.process_mentions(
                     content=data.content,
@@ -111,7 +111,7 @@ async def create_comment(
                 # Notify parent comment author if this is a reply
                 if data.parent_id:
                     # Find parent comment author
-                    parent_comment = comment_service.find_comment_by_id(
+                    parent_comment = await comment_service.find_comment_by_id(
                         data.lesson_id, data.parent_id
                     )
                     if parent_comment:
@@ -328,7 +328,7 @@ async def add_reaction(
         if notification_service and not is_toggle_off:
             try:
                 # Find comment author to notify
-                target_comment = comment_service.find_comment_by_id(
+                target_comment = await comment_service.find_comment_by_id(
                     lesson_id, comment_id
                 )
                 if target_comment:

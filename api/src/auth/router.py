@@ -162,7 +162,7 @@ async def register(
     to access course content.
     """
     try:
-        user = auth_service.register_user(data)
+        user = await auth_service.register_user(data)
         return auth_service.to_response(user)
     except UserExistsError as e:
         raise handle_auth_error(e) from e
@@ -193,8 +193,8 @@ async def login(
     user_agent, ip_address = client_info
 
     try:
-        user = auth_service.authenticate_user(data.email, data.password)
-        access_token, refresh_token = auth_service.create_tokens(
+        user = await auth_service.authenticate_user(data.email, data.password)
+        access_token, refresh_token = await auth_service.create_tokens(
             user, user_agent, ip_address
         )
     except (InvalidCredentialsError, UserInactiveError, SessionLimitExceededError) as e:
@@ -246,7 +246,7 @@ async def refresh(
     user_agent, ip_address = client_info
 
     try:
-        access_token, new_refresh_token = auth_service.refresh_tokens(
+        access_token, new_refresh_token = await auth_service.refresh_tokens(
             refresh_token, user_agent, ip_address
         )
     except (InvalidTokenError, UserInactiveError) as e:
@@ -293,7 +293,7 @@ async def logout(
     # Revoke token if present (suppress error if already invalid)
     if refresh_token:
         with contextlib.suppress(InvalidTokenError):
-            auth_service.revoke_token(refresh_token)
+            await auth_service.revoke_token(refresh_token)
 
     # Clear cookie
     response.delete_cookie(
@@ -323,7 +323,7 @@ async def validate_cpf_endpoint(
         return ValidateCPFResponse(valid=False)
 
     # Check availability
-    available = auth_service.is_cpf_available(data.cpf)
+    available = await auth_service.is_cpf_available(data.cpf)
 
     return ValidateCPFResponse(
         valid=True,
@@ -342,7 +342,7 @@ async def validate_email_endpoint(
     auth_service: AuthServiceDep,
 ) -> ValidateEmailResponse:
     """Check if email is available for registration."""
-    available = auth_service.is_email_available(data.email)
+    available = await auth_service.is_email_available(data.email)
     return ValidateEmailResponse(available=available)
 
 
@@ -364,7 +364,7 @@ async def get_me(
 
     Returns full user data from database (not just token claims).
     """
-    db_user = auth_service.get_user_by_id(UUID(str(user.id)))
+    db_user = await auth_service.get_user_by_id(UUID(str(user.id)))
     if not db_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -386,7 +386,7 @@ async def update_me(
 ) -> UserResponse:
     """Update current user's profile fields."""
     try:
-        updated_user = auth_service.update_user_profile(
+        updated_user = await auth_service.update_user_profile(
             user_id=UUID(str(user.id)),
             name=data.name,
             phone=data.phone,
@@ -409,7 +409,7 @@ async def change_password(
 ) -> MessageResponse:
     """Change current user's password."""
     try:
-        auth_service.change_password(
+        await auth_service.change_password(
             user_id=UUID(str(user.id)),
             current_password=data.current_password,
             new_password=data.new_password,
@@ -432,7 +432,7 @@ async def logout_all_devices(
     """Revoke all refresh tokens (logout from all devices)."""
     settings = get_settings()
 
-    auth_service.revoke_all_user_tokens(UUID(str(user.id)))
+    await auth_service.revoke_all_user_tokens(UUID(str(user.id)))
 
     # Clear current cookie
     response.delete_cookie(
@@ -475,7 +475,7 @@ async def update_user_role(
         )
 
     # Fetch target user to check their current role
-    target_user = auth_service.get_user_by_id(user_id)
+    target_user = await auth_service.get_user_by_id(user_id)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -498,7 +498,7 @@ async def update_user_role(
         )
 
     try:
-        updated_user = auth_service.update_user_role(user_id, data.role)
+        updated_user = await auth_service.update_user_role(user_id, data.role)
         return auth_service.to_response(updated_user)
     except UserNotFoundError as e:
         raise handle_auth_error(e) from e
@@ -531,7 +531,7 @@ async def deactivate_user(
         )
 
     # Fetch target user to check their role
-    target_user = auth_service.get_user_by_id(user_id)
+    target_user = await auth_service.get_user_by_id(user_id)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -546,7 +546,7 @@ async def deactivate_user(
         )
 
     try:
-        auth_service.deactivate_user(user_id)
+        await auth_service.deactivate_user(user_id)
     except UserNotFoundError as e:
         raise handle_auth_error(e) from e
 
@@ -573,7 +573,7 @@ async def list_users(
         role: Filter by role
         limit: Max results (default 50)
     """
-    users = auth_service.search_users(search=search, role=role, limit=limit)
+    users = await auth_service.search_users(search=search, role=role, limit=limit)
     return UserListResponse(
         items=[auth_service.to_response(u) for u in users],
         total=len(users),
@@ -602,7 +602,7 @@ async def admin_create_user(
     All other fields are optional.
     """
     try:
-        user = auth_service.admin_create_user(data)
+        user = await auth_service.admin_create_user(data)
         return auth_service.to_response(user)
     except UserExistsError as e:
         raise handle_auth_error(e) from e
@@ -640,7 +640,7 @@ async def update_user_max_sessions(
         )
 
     # Fetch target user to check their role
-    target_user = auth_service.get_user_by_id(user_id)
+    target_user = await auth_service.get_user_by_id(user_id)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -655,7 +655,7 @@ async def update_user_max_sessions(
         )
 
     try:
-        updated_user = auth_service.update_user_max_sessions(
+        updated_user = await auth_service.update_user_max_sessions(
             user_id, data.max_concurrent_sessions
         )
         return auth_service.to_response(updated_user)
@@ -689,7 +689,7 @@ async def get_user_details(
     Requires admin permissions.
     """
     # Fetch user
-    user = auth_service.get_user_by_id(user_id)
+    user = await auth_service.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -697,9 +697,9 @@ async def get_user_details(
         )
 
     # Get session info
-    active_sessions = auth_service.count_active_sessions(user_id)
+    active_sessions = await auth_service.count_active_sessions(user_id)
     max_sessions = user.max_concurrent_sessions or 10
-    first_access, last_access = auth_service.get_session_access_times(user_id)
+    first_access, last_access = await auth_service.get_session_access_times(user_id)
 
     session_info = UserSessionInfo(
         active_sessions=active_sessions,
@@ -712,7 +712,9 @@ async def get_user_details(
     progress_data: dict = {}
     app_state = request.app.state
     if hasattr(app_state, "progress_service") and app_state.progress_service:
-        progress_data = app_state.progress_service.get_user_progress_summary(user_id)
+        progress_data = await app_state.progress_service.get_user_progress_summary(
+            user_id
+        )
 
     last_lesson = None
     if progress_data.get("last_lesson"):
@@ -729,7 +731,9 @@ async def get_user_details(
     # Get comments count (if service available)
     comments_count = 0
     if hasattr(app_state, "comment_service") and app_state.comment_service:
-        comments_count = app_state.comment_service.count_comments_by_author(user_id)
+        comments_count = await app_state.comment_service.count_comments_by_author(
+            user_id
+        )
 
     return UserDetailsResponse(
         user=auth_service.to_response(user),

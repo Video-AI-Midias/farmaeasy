@@ -56,7 +56,7 @@ async def validate_course_access(
         HTTPException 403: If user does not have access
     """
     # Get course to determine creator_id
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     course_creator_id = course.creator_id if course else None
 
     has_access = await acquisition_service.has_active_access(
@@ -102,7 +102,7 @@ async def update_video_progress(
     )
 
     try:
-        progress = progress_service.update_video_progress(
+        progress = await progress_service.update_video_progress(
             user_id=UUID(str(user.id)),
             lesson_id=data.lesson_id,
             course_id=data.course_id,
@@ -144,7 +144,7 @@ async def mark_lesson_complete(
     )
 
     try:
-        progress = progress_service.mark_lesson_complete(
+        progress = await progress_service.mark_lesson_complete(
             user_id=UUID(str(user.id)),
             lesson_id=data.lesson_id,
             course_id=data.course_id,
@@ -179,7 +179,7 @@ async def mark_lesson_incomplete(
     )
 
     try:
-        progress = progress_service.mark_lesson_incomplete(
+        progress = await progress_service.mark_lesson_incomplete(
             user_id=UUID(str(user.id)),
             lesson_id=data.lesson_id,
             course_id=data.course_id,
@@ -217,7 +217,7 @@ async def get_lesson_progress(
     # Validate access before returning progress
     await validate_course_access(course_id, user, acquisition_service, course_service)
 
-    return progress_service.get_lesson_progress_check(
+    return await progress_service.get_lesson_progress_check(
         user_id=UUID(str(user.id)),
         course_id=course_id,
         module_id=module_id,
@@ -246,14 +246,14 @@ async def get_course_progress(
     # Validate access before returning progress
     await validate_course_access(course_id, user, acquisition_service, course_service)
 
-    result = progress_service.get_course_progress(
+    result = await progress_service.get_course_progress(
         user_id=UUID(str(user.id)),
         course_id=course_id,
     )
     if result is None:
         # Auto-enroll if not enrolled
-        progress_service.enroll_user(UUID(str(user.id)), course_id)
-        result = progress_service.get_course_progress(
+        await progress_service.enroll_user(UUID(str(user.id)), course_id)
+        result = await progress_service.get_course_progress(
             user_id=UUID(str(user.id)),
             course_id=course_id,
         )
@@ -287,7 +287,7 @@ async def enroll_in_course(
     user_id = UUID(str(user.id))
 
     # 1. Check course exists
-    course = course_service.get_course(data.course_id)
+    course = await course_service.get_course(data.course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -317,7 +317,7 @@ async def enroll_in_course(
 
     # 4. Create enrollment
     try:
-        enrollment = progress_service.enroll_user(
+        enrollment = await progress_service.enroll_user(
             user_id=user_id,
             course_id=data.course_id,
         )
@@ -349,7 +349,7 @@ async def get_my_enrollments(
     user: CurrentUser,
 ) -> EnrollmentListResponse:
     """Get all course enrollments for current user."""
-    enrollments = progress_service.get_user_enrollments(UUID(str(user.id)))
+    enrollments = await progress_service.get_user_enrollments(UUID(str(user.id)))
     return EnrollmentListResponse(
         items=[
             EnrollmentResponse(
@@ -383,7 +383,7 @@ async def get_enrollment(
     user: CurrentUser,
 ) -> EnrollmentResponse:
     """Get enrollment status for a specific course."""
-    enrollment = progress_service.get_enrollment(UUID(str(user.id)), course_id)
+    enrollment = await progress_service.get_enrollment(UUID(str(user.id)), course_id)
     if enrollment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

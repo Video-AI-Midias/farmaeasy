@@ -113,7 +113,7 @@ async def check_course_access(
     3. Student: Has access via acquisition only
     """
     # Fetch course to get creator_id
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     course_creator_id = course.creator_id if course else None
 
     return await service.check_access(
@@ -153,7 +153,7 @@ async def grant_access(
     - Temporary access (expires_in_days > 0)
     """
     # Verify course exists and user has permission
-    course = course_service.get_course(request.course_id)
+    course = await course_service.get_course(request.course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -202,7 +202,7 @@ async def batch_grant_access(
     - TEACHER: Can grant access only to own courses
     """
     # Verify course exists and user has permission
-    course = course_service.get_course(request.course_id)
+    course = await course_service.get_course(request.course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -251,7 +251,7 @@ async def revoke_access(
     - TEACHER: Can revoke access only from own courses
     """
     # Verify course exists and user has permission
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -304,7 +304,7 @@ async def list_course_students(
     acquisition details (type, status, dates).
     """
     # Verify course exists and user has permission
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -327,7 +327,7 @@ async def list_course_students(
 
     for acq in acquisitions:
         # Get user data
-        user = auth_service.get_user_by_id(acq.user_id)
+        user = await auth_service.get_user_by_id(acq.user_id)
 
         if not user:
             # Skip if user not found (should not happen in normal operation)
@@ -395,7 +395,7 @@ async def count_course_students(
     - TEACHER: Can count students only from own courses
     """
     # Verify course exists and user has permission
-    course = course_service.get_course(course_id)
+    course = await course_service.get_course(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
