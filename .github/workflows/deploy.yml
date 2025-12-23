@@ -241,6 +241,30 @@ jobs:
             api/.env.example \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/api/.env
 
+          # Inject/Update Bunny.net secrets in .env file
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'BUNNY_EOF'
+            set -e
+            ENV_FILE="${{ env.REMOTE_DIR }}/api/.env"
+
+            # Function to update or add env var
+            update_env() {
+              local key="$1"
+              local value="$2"
+              if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+                sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+              else
+                echo "${key}=${value}" >> "$ENV_FILE"
+              fi
+            }
+
+            update_env "BUNNY_LIBRARY_ID" "${{ secrets.BUNNY_LIBRARY_ID }}"
+            update_env "BUNNY_CDN_HOSTNAME" "${{ secrets.BUNNY_CDN_HOSTNAME }}"
+            update_env "BUNNY_TOKEN_KEY" "${{ secrets.BUNNY_TOKEN_KEY }}"
+            update_env "BUNNY_API_KEY" "${{ secrets.BUNNY_API_KEY }}"
+
+            echo "✅ Bunny.net secrets injected into .env"
+          BUNNY_EOF
+
           # Sync Google Service Account credentials
           ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.REMOTE_DIR }}/api/credentials"
           rsync -avz \

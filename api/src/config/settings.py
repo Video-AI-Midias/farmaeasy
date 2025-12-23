@@ -160,6 +160,10 @@ class Settings(BaseSettings):
     bunny_token_key: str | None = Field(
         default=None, description="Bunny.net Token Authentication Key (KEEP SECRET!)"
     )
+    bunny_api_key: str | None = Field(
+        default=None,
+        description="Bunny.net Stream API Key for video management (KEEP SECRET!)",
+    )
     bunny_token_expiry_seconds: int = Field(
         default=14400, description="Token expiry time in seconds (default: 4 hours)"
     )
@@ -228,6 +232,11 @@ class Settings(BaseSettings):
         return bool(
             self.bunny_library_id and self.bunny_cdn_hostname and self.bunny_token_key
         )
+
+    @property
+    def bunny_api_configured(self) -> bool:
+        """Check if Bunny.net Stream API is configured for video management."""
+        return bool(self.bunny_library_id and self.bunny_api_key)
 
     @property
     def firebase_configured(self) -> bool:

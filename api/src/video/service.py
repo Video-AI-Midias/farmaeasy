@@ -4,17 +4,21 @@ This service handles:
 - Generating signed embed URLs for Bunny.net Stream videos
 - Token authentication for secure video access
 - URL parsing and video ID extraction
+- Listing videos from Bunny.net library
 
-SECURITY: The token_key is kept server-side and never exposed to clients.
+SECURITY: The token_key and api_key are kept server-side and never exposed to clients.
 """
 
 import hashlib
+import math
 import re
 import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 from urllib.parse import urlencode, urlparse
 
+import httpx
 import structlog
 
 from src.config.settings import Settings
@@ -55,6 +59,10 @@ class InvalidVideoUrlError(BunnyServiceError):
     """Raised when a video URL cannot be parsed."""
 
 
+class VideoApiError(BunnyServiceError):
+    """Raised when Bunny.net API request fails."""
+
+
 class BunnyService:
     """Service for generating secure Bunny.net Stream URLs.
 
@@ -75,6 +83,21 @@ class BunnyService:
     HLS_PATTERN = re.compile(r"([a-f0-9-]+)/playlist\.m3u8", re.IGNORECASE)
     VIDEO_ID_PATTERN = re.compile(r"^[a-f0-9-]{36}$", re.IGNORECASE)
 
+    # Bunny.net Stream API base URL
+    BUNNY_API_BASE = "https://video.bunnycdn.com"
+
+    # Video status codes from Bunny.net
+    VIDEO_STATUS_MAP: dict[int, str] = {
+        0: "created",
+        1: "uploading",
+        2: "processing",
+        3: "encoding",
+        4: "finished",
+        5: "resolution_finished",
+        6: "error",
+        7: "upload_failed",
+    }
+
     def __init__(self, settings: Settings) -> None:
         """Initialize Bunny service with settings.
 
@@ -85,12 +108,18 @@ class BunnyService:
         self._library_id = settings.bunny_library_id
         self._cdn_hostname = settings.bunny_cdn_hostname
         self._token_key = settings.bunny_token_key
+        self._api_key = settings.bunny_api_key
         self._token_expiry = settings.bunny_token_expiry_seconds
 
     @property
     def is_configured(self) -> bool:
         """Check if Bunny.net is properly configured."""
         return self.settings.bunny_configured
+
+    @property
+    def is_api_configured(self) -> bool:
+        """Check if Bunny.net Stream API is configured for video management."""
+        return self.settings.bunny_api_configured
 
     def _ensure_configured(self) -> None:
         """Raise error if Bunny.net is not configured."""
@@ -415,3 +444,131 @@ class BunnyService:
             return self.generate_thumbnail_url(parsed.video_id, animated=animated)
         except InvalidVideoUrlError:
             return None
+
+    def _ensure_api_configured(self) -> None:
+        """Raise error if Bunny.net API is not configured."""
+        if not self.is_api_configured:
+            raise VideoNotConfiguredError(
+                "Bunny.net Stream API is not configured. "
+                "Please set BUNNY_LIBRARY_ID and BUNNY_API_KEY."
+            )
+
+    async def list_videos(
+        self,
+        *,
+        page: int = 1,
+        items_per_page: int = 20,
+        search: str | None = None,
+        collection: str | None = None,
+        order_by: str = "date",
+    ) -> dict[str, Any]:
+        """List videos from Bunny.net library.
+
+        Fetches videos from the Bunny.net Stream API with pagination and filtering.
+
+        Args:
+            page: Page number (1-indexed).
+            items_per_page: Number of items per page (max 100).
+            search: Search term for video title.
+            collection: Filter by collection GUID.
+            order_by: Order by field (date, title, views).
+
+        Returns:
+            Dict containing videos list and pagination info.
+
+        Raises:
+            VideoNotConfiguredError: If API is not configured.
+            VideoApiError: If API request fails.
+        """
+        self._ensure_api_configured()
+
+        # Build URL for Bunny.net Stream API
+        url = f"{self.BUNNY_API_BASE}/library/{self._library_id}/videos"
+
+        # Build query parameters
+        params: dict[str, str | int] = {
+            "page": page,
+            "itemsPerPage": items_per_page,
+            "orderBy": order_by,
+        }
+        if search:
+            params["search"] = search
+        if collection:
+            params["collection"] = collection
+
+        headers = {
+            "AccessKey": self._api_key or "",
+            "Accept": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, params=params, headers=headers)
+
+                if response.status_code != httpx.codes.OK:
+                    logger.error(
+                        "Bunny API request failed",
+                        status_code=response.status_code,
+                        response_text=response.text[:500],
+                    )
+                    raise VideoApiError(f"Bunny.net API error: {response.status_code}")
+
+                data = response.json()
+
+        except httpx.TimeoutException as e:
+            logger.error("Bunny API timeout", error=str(e))
+            raise VideoApiError("Bunny.net API timeout") from e
+        except httpx.RequestError as e:
+            logger.error("Bunny API request error", error=str(e))
+            raise VideoApiError(f"Bunny.net API request error: {e}") from e
+
+        # Parse response
+        total_items = data.get("totalItems", 0)
+        items = data.get("items", [])
+        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 0
+
+        # Transform items to our schema
+        videos = []
+        for item in items:
+            video_id = item.get("guid", "")
+            status_code = item.get("status", 0)
+            thumbnail_filename = item.get("thumbnailFileName")
+
+            # Build thumbnail URLs using actual filename from API
+            thumbnail_url = None
+            thumbnail_animated_url = None
+            if video_id and self._cdn_hostname:
+                base_url = f"https://{self._cdn_hostname}/{video_id}"
+                if thumbnail_filename:
+                    thumbnail_url = f"{base_url}/{thumbnail_filename}"
+                thumbnail_animated_url = f"{base_url}/preview.webp"
+
+            video = {
+                "video_id": video_id,
+                "title": item.get("title", "Untitled"),
+                "length": item.get("length", 0),
+                "status": status_code,
+                "status_text": self.VIDEO_STATUS_MAP.get(status_code, "unknown"),
+                "thumbnail_url": thumbnail_url,
+                "thumbnail_animated_url": thumbnail_animated_url,
+                "date_uploaded": item.get("dateUploaded"),
+                "views": item.get("views", 0),
+                "storage_size": item.get("storageSize", 0),
+            }
+            videos.append(video)
+
+        logger.debug(
+            "Listed videos from Bunny library",
+            page=page,
+            items_per_page=items_per_page,
+            total_items=total_items,
+            returned_count=len(videos),
+        )
+
+        return {
+            "videos": videos,
+            "total_items": total_items,
+            "current_page": page,
+            "items_per_page": items_per_page,
+            "total_pages": total_pages,
+        }

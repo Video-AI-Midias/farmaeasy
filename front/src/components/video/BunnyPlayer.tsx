@@ -439,7 +439,7 @@ function IframePlayer({
   onPlay,
   onPause,
   onReady,
-  onError: _onError, // Reserved for future use
+  onError,
   startTime,
   className,
   aspectRatioClass,
@@ -461,9 +461,21 @@ function IframePlayer({
   const lastProgressRef = useRef<number>(0);
   const lastDurationRef = useRef<number>(0); // Store duration for ended event
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevEmbedUrlRef = useRef<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Log the embed URL for debugging (only in dev)
+  useEffect(() => {
+    if (embedUrl) {
+      console.log("[BunnyPlayer] Embed URL configured:", {
+        url: `${embedUrl.substring(0, 100)}...`,
+        hasToken: embedUrl.includes("token="),
+        hasExpires: embedUrl.includes("expires="),
+      });
+    }
+  }, [embedUrl]);
 
   // Use refs for callbacks to avoid re-creating initializePlayer when callbacks change
   const onProgressRef = useRef(onProgress);
@@ -632,6 +644,12 @@ function IframePlayer({
       playerjsAvailable: typeof window.playerjs !== "undefined",
     });
 
+    // Clear load timeout since iframe loaded
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+
     if (!iframeRef.current) {
       console.warn("[BunnyPlayer] Iframe ref is null on load");
       return;
@@ -663,6 +681,39 @@ function IframePlayer({
     }
   }, [initializePlayer]);
 
+  // Timeout-based error detection - if iframe never becomes ready, show error
+  // This catches cases like 403 errors that don't trigger iframe onerror
+  useEffect(() => {
+    if (embedUrl && !isReady && !error) {
+      // Clear any previous timeout
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+
+      // Set timeout to detect failed loads (8 seconds should be enough)
+      loadTimeoutRef.current = setTimeout(() => {
+        if (!isReady && !error) {
+          console.error("[BunnyPlayer] Video load timeout - possible 403 error");
+          console.error(
+            "[BunnyPlayer] This usually means the Bunny.net 'Allowed Referrers' setting",
+          );
+          console.error("[BunnyPlayer] needs to include this domain:", window.location.origin);
+          setError(
+            "Erro ao carregar video. Verifique se o dominio esta autorizado nas configuracoes do Bunny.net (Allowed Referrers).",
+          );
+          onError?.(new Error("Video load timeout - possible 403 error"));
+        }
+      }, 8000);
+
+      return () => {
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
+      };
+    }
+  }, [embedUrl, isReady, error, onError]);
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -671,6 +722,9 @@ function IframePlayer({
       }
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
+      }
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
       }
     };
   }, []);

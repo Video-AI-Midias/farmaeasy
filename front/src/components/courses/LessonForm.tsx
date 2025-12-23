@@ -32,7 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { VideoSelectorModal } from "@/components/video/VideoSelectorModal";
 import { VideoThumbnail } from "@/components/video/VideoThumbnail";
+import type { VideoItem } from "@/lib/video-api";
 import {
   ContentStatus,
   ContentType,
@@ -41,8 +43,8 @@ import {
   type UpdateLessonRequest,
 } from "@/types/courses";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { Loader2, Video } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -163,6 +165,7 @@ export function LessonForm({
   isSubmitting = false,
 }: LessonFormProps) {
   const isEditing = !!lesson;
+  const [videoSelectorOpen, setVideoSelectorOpen] = useState(false);
 
   const form = useForm<LessonFormData>({
     resolver: zodResolver(lessonSchema),
@@ -175,6 +178,15 @@ export function LessonForm({
       status: ContentStatus.DRAFT,
     },
   });
+
+  // Handler for video selection from modal
+  const handleVideoSelect = (video: VideoItem) => {
+    form.setValue("content_url", video.video_id, { shouldValidate: true });
+    // Auto-fill duration if available
+    if (video.length > 0) {
+      form.setValue("duration_seconds", video.length, { shouldValidate: true });
+    }
+  };
 
   // Watch content_type for dynamic label updates
   const contentType = form.watch("content_type");
@@ -318,23 +330,36 @@ export function LessonForm({
                   <FormLabel>
                     URL do Conteudo {isUrlRequired && <span className="text-destructive">*</span>}
                   </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      placeholder={
-                        contentType === ContentType.VIDEO
-                          ? "ID do video ou URL (obrigatorio)"
-                          : contentType === ContentType.PDF
-                            ? "URL do PDF (obrigatorio)"
-                            : "URL do conteudo (opcional)"
-                      }
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder={
+                          contentType === ContentType.VIDEO
+                            ? "ID do video ou URL (obrigatorio)"
+                            : contentType === ContentType.PDF
+                              ? "URL do PDF (obrigatorio)"
+                              : "URL do conteudo (opcional)"
+                        }
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    {contentType === ContentType.VIDEO && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setVideoSelectorOpen(true)}
+                        title="Selecionar video da biblioteca"
+                      >
+                        <Video className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   <FormDescription>
                     {contentType === ContentType.VIDEO
-                      ? "ID do video Bunny.net, URL de embed/play, ou URL direta do video"
+                      ? "ID do video Bunny.net, URL de embed/play, ou clique no icone para selecionar"
                       : contentType === ContentType.PDF
                         ? "URL do arquivo PDF"
                         : "URL do conteudo (opcional)"}
@@ -418,6 +443,14 @@ export function LessonForm({
             </DialogFooter>
           </form>
         </Form>
+
+        {/* Video selector modal */}
+        <VideoSelectorModal
+          open={videoSelectorOpen}
+          onOpenChange={setVideoSelectorOpen}
+          onSelect={handleVideoSelect}
+          selectedVideoId={form.watch("content_url")}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -61,6 +61,44 @@ export interface ThumbnailResponse {
 }
 
 /**
+ * Request for listing videos from Bunny library
+ */
+export interface VideoListRequest {
+  page?: number;
+  items_per_page?: number;
+  search?: string;
+  collection?: string;
+  order_by?: "date" | "title" | "views";
+}
+
+/**
+ * Single video item from Bunny library
+ */
+export interface VideoItem {
+  video_id: string;
+  title: string;
+  length: number;
+  status: number;
+  status_text: string;
+  thumbnail_url: string | null;
+  thumbnail_animated_url: string | null;
+  date_uploaded: string | null;
+  views: number;
+  storage_size: number;
+}
+
+/**
+ * Response with list of videos from Bunny library
+ */
+export interface VideoListResponse {
+  videos: VideoItem[];
+  total_items: number;
+  current_page: number;
+  items_per_page: number;
+  total_pages: number;
+}
+
+/**
  * Video API endpoints
  */
 export const videoApi = {
@@ -94,6 +132,18 @@ export const videoApi = {
    */
   getThumbnail: async (request: ThumbnailRequest): Promise<ThumbnailResponse> => {
     const response = await api.post<ThumbnailResponse>("/video/thumbnail", request);
+    return response.data;
+  },
+
+  /**
+   * List videos from Bunny.net library.
+   * Requires authentication.
+   *
+   * @param request - Pagination and search options
+   * @returns List of videos with pagination info
+   */
+  listVideos: async (request: VideoListRequest = {}): Promise<VideoListResponse> => {
+    const response = await api.post<VideoListResponse>("/video/library/videos", request);
     return response.data;
   },
 };

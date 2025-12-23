@@ -88,3 +88,50 @@ class ThumbnailResponse(BaseModel):
     video_id: str = Field(..., description="Extracted video ID")
     thumbnail_url: str = Field(..., description="Thumbnail URL")
     animated: bool = Field(..., description="Whether this is an animated preview")
+
+
+class VideoListRequest(BaseModel):
+    """Request for listing videos from Bunny library."""
+
+    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
+    items_per_page: int = Field(
+        default=20, ge=1, le=100, description="Items per page (max 100)"
+    )
+    search: str | None = Field(
+        default=None, max_length=200, description="Search term for video title"
+    )
+    collection: str | None = Field(
+        default=None, description="Filter by collection GUID"
+    )
+    order_by: str = Field(default="date", description="Order by: date, title, or views")
+
+
+class VideoItem(BaseModel):
+    """Single video item from Bunny library."""
+
+    video_id: str = Field(..., description="Video GUID")
+    title: str = Field(..., description="Video title")
+    length: int = Field(default=0, description="Video duration in seconds")
+    status: int = Field(default=0, description="Video status code")
+    status_text: str = Field(default="unknown", description="Human-readable status")
+    thumbnail_url: str | None = Field(
+        default=None, description="Thumbnail URL (static)"
+    )
+    thumbnail_animated_url: str | None = Field(
+        default=None, description="Animated thumbnail URL (WebP)"
+    )
+    date_uploaded: str | None = Field(
+        default=None, description="Upload date (ISO format)"
+    )
+    views: int = Field(default=0, description="Total view count")
+    storage_size: int = Field(default=0, description="Storage size in bytes")
+
+
+class VideoListResponse(BaseModel):
+    """Response with list of videos from Bunny library."""
+
+    videos: list[VideoItem] = Field(default_factory=list, description="List of videos")
+    total_items: int = Field(default=0, description="Total number of videos")
+    current_page: int = Field(default=1, description="Current page number")
+    items_per_page: int = Field(default=20, description="Items per page")
+    total_pages: int = Field(default=0, description="Total number of pages")

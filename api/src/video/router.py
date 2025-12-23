@@ -17,10 +17,13 @@ from src.video.schemas import (
     ThumbnailRequest,
     ThumbnailResponse,
     VideoConfigResponse,
+    VideoListRequest,
+    VideoListResponse,
 )
 from src.video.service import (
     BunnyService,
     InvalidVideoUrlError,
+    VideoApiError,
     VideoNotConfiguredError,
 )
 
@@ -161,5 +164,46 @@ async def generate_thumbnail_url(
     except InvalidVideoUrlError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
+
+@router.post(
+    "/library/videos",
+    response_model=VideoListResponse,
+    summary="List videos from Bunny library",
+)
+async def list_library_videos(
+    data: VideoListRequest,
+    bunny_service: BunnyServiceDep,
+    _user: CurrentUser,  # Required for auth
+) -> VideoListResponse:
+    """List videos from Bunny.net library (authenticated users only).
+
+    This endpoint fetches videos from the Bunny.net Stream library with
+    pagination and search capabilities. Requires authentication.
+
+    The response includes video metadata, thumbnails, and pagination info.
+    """
+    try:
+        result = await bunny_service.list_videos(
+            page=data.page,
+            items_per_page=data.items_per_page,
+            search=data.search,
+            collection=data.collection,
+            order_by=data.order_by,
+        )
+
+        return VideoListResponse(**result)
+
+    except VideoNotConfiguredError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        ) from e
+
+    except VideoApiError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(e),
         ) from e
