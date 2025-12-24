@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { StarRating } from "@/components/ui/star-rating";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import BunnyPlayer from "@/components/video/BunnyPlayer";
 import { useComments } from "@/hooks/useComments";
@@ -448,11 +449,11 @@ function VideoContent({
     onComplete?.();
   }, [onComplete]);
 
-  // Video progress tracking - WITH onComplete at 90% threshold
-  // This ensures lesson is marked complete even if onEnded doesn't fire
+  // Video progress tracking - WITH onComplete at 100% threshold
+  // Video ends → handleVideoEnded (backup) OR 100% progress → both trigger completion
   const { updateProgress } = useVideoProgress(lesson.id, courseId, moduleId, {
     onComplete: handleCompletion,
-    completionThreshold: 90,
+    completionThreshold: 100,
   });
 
   // Track if we've set the start time
@@ -1232,6 +1233,31 @@ export function StudentLessonViewContent() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Lesson Rating Section */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left">
+                    <p className="font-medium">Gostou desta aula?</p>
+                    <p className="text-sm text-muted-foreground">
+                      Deixe sua avaliacao para nos ajudar a melhorar
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StarRating
+                      value={0}
+                      onChange={() => setShowReviewOverlay(true)}
+                      size="md"
+                      className="cursor-pointer"
+                    />
+                    <Button variant="outline" size="sm" onClick={() => setShowReviewOverlay(true)}>
+                      Avaliar
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Navigation */}

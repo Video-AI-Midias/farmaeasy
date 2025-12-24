@@ -51,18 +51,22 @@ export function useProgress(courseId: string | null) {
   const markLessonComplete = useCallback(
     async (lessonId: string, moduleId: string) => {
       if (!courseId) return;
-      return markLessonCompleteAction(lessonId, courseId, moduleId);
+      await markLessonCompleteAction(lessonId, courseId, moduleId);
+      // Refresh course progress to update aggregate progress (sidebar)
+      await fetchCourseProgress(courseId);
     },
-    [courseId, markLessonCompleteAction],
+    [courseId, markLessonCompleteAction, fetchCourseProgress],
   );
 
   // Mark lesson incomplete (reset for rewatch)
   const markLessonIncomplete = useCallback(
     async (lessonId: string, moduleId: string) => {
       if (!courseId) return;
-      return markLessonIncompleteAction(lessonId, courseId, moduleId);
+      await markLessonIncompleteAction(lessonId, courseId, moduleId);
+      // Refresh course progress to update aggregate progress (sidebar)
+      await fetchCourseProgress(courseId);
     },
-    [courseId, markLessonIncompleteAction],
+    [courseId, markLessonIncompleteAction, fetchCourseProgress],
   );
 
   // Check if lesson is completed

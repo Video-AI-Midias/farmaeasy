@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn, renderTextWithLinks } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
 import {
   ContentStatus,
@@ -245,7 +245,9 @@ function CourseDetailContent() {
               </Badge>
             </div>
             {currentCourse.description && (
-              <p className="text-muted-foreground ml-10">{currentCourse.description}</p>
+              <p className="text-muted-foreground ml-10 whitespace-pre-wrap">
+                {renderTextWithLinks(currentCourse.description)}
+              </p>
             )}
           </div>
           <div className="flex gap-2">

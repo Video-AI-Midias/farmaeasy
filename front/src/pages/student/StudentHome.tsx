@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { useAuth } from "@/hooks/useAuth";
 import { coursesApi } from "@/lib/courses-api";
-import { cn } from "@/lib/utils";
+import { cn, renderTextWithLinks } from "@/lib/utils";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useProgressStore } from "@/stores/progress";
 import type { Course } from "@/types/courses";
@@ -216,7 +216,7 @@ function AvailableCourseCard({ course, isEnrolled }: AvailableCourseCardProps) {
             </TruncatedText>
             {course.description && (
               <TruncatedText lines={2} className="mt-1 text-sm text-muted-foreground">
-                {course.description}
+                {renderTextWithLinks(course.description)}
               </TruncatedText>
             )}
             <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
