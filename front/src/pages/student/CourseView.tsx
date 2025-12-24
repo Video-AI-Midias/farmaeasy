@@ -22,7 +22,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress";
 import { useProgress } from "@/hooks/useProgress";
 import { acquisitionsApi } from "@/lib/acquisitions-api";
-import { cn } from "@/lib/utils";
+import { cn, renderTextWithLinks } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
 import { AccessReason, type CheckAccessResponse } from "@/types/acquisitions";
 import { ContentType, type LessonInModule, type ModuleInCourse } from "@/types/courses";
@@ -111,7 +111,9 @@ function ModuleItem({
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>
                   {module.description && (
-                    <CardDescription className="mt-1">{module.description}</CardDescription>
+                    <CardDescription className="mt-1 whitespace-pre-wrap">
+                      {renderTextWithLinks(module.description)}
+                    </CardDescription>
                   )}
                 </div>
               </div>
@@ -368,7 +370,9 @@ export function StudentCourseViewContent() {
               <h1 className="text-2xl font-bold md:text-3xl">{currentCourse.title}</h1>
 
               {currentCourse.description && (
-                <p className="text-muted-foreground">{currentCourse.description}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">
+                  {renderTextWithLinks(currentCourse.description)}
+                </p>
               )}
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
