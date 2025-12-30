@@ -6,6 +6,7 @@
  * - Grant permanent or temporary access
  * - Add optional notes
  * - Improved UX with loading states and feedback
+ * - Integration with CreateStudentDialog for creating new students
  */
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { UserCombobox } from "@/components/ui/user-combobox";
+import { CreateStudentDialog } from "@/components/users";
 import { acquisitionsAdminApi } from "@/lib/acquisitions-api";
+import { useAuthStore } from "@/stores/auth";
 import type { User } from "@/types/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, UserPlus } from "lucide-react";
@@ -80,6 +83,12 @@ export function GrantAccessDialog({
 }: GrantAccessDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [createStudentOpen, setCreateStudentOpen] = useState(false);
+
+  // Get current user to determine API to use
+  const currentUser = useAuthStore((state) => state.user);
+  const isTeacher = currentUser?.role === "teacher";
+  const isAdmin = currentUser?.role === "admin";
 
   const form = useForm({
     resolver: zodResolver(grantAccessSchema),
@@ -154,6 +163,14 @@ export function GrantAccessDialog({
     onOpenChange(newOpen);
   };
 
+  // Handle student created successfully
+  const handleStudentCreated = (user: User) => {
+    setSelectedUser(user);
+    form.setValue("user_id", user.id);
+    form.clearErrors("user_id");
+    setCreateStudentOpen(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -182,6 +199,20 @@ export function GrantAccessDialog({
                     required
                     error={fieldState.error?.message}
                     disabled={isSubmitting}
+                    useTeacherApi={isTeacher && !isAdmin}
+                    emptyStateAction={
+                      (isTeacher || isAdmin) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCreateStudentOpen(true)}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Cadastrar novo aluno
+                        </Button>
+                      )
+                    }
                   />
                 </FormItem>
               )}
@@ -320,6 +351,14 @@ export function GrantAccessDialog({
           </form>
         </Form>
       </DialogContent>
+
+      {/* Create Student Dialog */}
+      <CreateStudentDialog
+        open={createStudentOpen}
+        onOpenChange={setCreateStudentOpen}
+        onSuccess={handleStudentCreated}
+        courseId={courseId}
+      />
     </Dialog>
   );
 }
