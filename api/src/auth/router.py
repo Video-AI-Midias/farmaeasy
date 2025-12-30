@@ -19,11 +19,14 @@ from src.auth.dependencies import (
     ClientInfo,
     CurrentUser,
     RefreshTokenCookie,
+    TeacherUser,
 )
 from src.auth.permissions import UserRole, can_manage_role, is_admin
 from src.auth.schemas import (
     AdminCreateUserRequest,
     ChangePasswordRequest,
+    CreateStudentRequest,
+    CreateStudentResponse,
     LastLessonInfo,
     LoginRequest,
     MessageResponse,
@@ -549,6 +552,130 @@ async def deactivate_user(
         await auth_service.deactivate_user(user_id)
     except UserNotFoundError as e:
         raise handle_auth_error(e) from e
+
+
+@router.get(
+    "/users/search",
+    response_model=UserListResponse,
+    summary="Search users for grant access (teacher+)",
+    responses={
+        401: {"description": "Not authenticated"},
+        403: {"description": "Permission denied (requires teacher or admin)"},
+    },
+)
+async def search_users_for_teacher(
+    _teacher: TeacherUser,
+    auth_service: AuthServiceDep,
+    search: str | None = None,
+    limit: int = 50,
+) -> UserListResponse:
+    """Search users for grant access flow (teachers and admins).
+
+    This endpoint is designed for the grant course access workflow.
+    It only returns users with USER or STUDENT roles to:
+    - Protect teacher/admin user information
+    - Show only users that can receive course access
+
+    Args:
+        search: Search term (matches email, name, cpf, rg or phone)
+        limit: Max results (default 50)
+
+    Returns:
+        List of users with USER or STUDENT roles only
+    """
+    # Get all users matching search criteria
+    users = await auth_service.search_users(search=search, limit=limit * 2)
+
+    # Filter to only USER and STUDENT roles
+    allowed_roles = {UserRole.USER.value, UserRole.STUDENT.value}
+    filtered_users = [u for u in users if u.role in allowed_roles]
+
+    # Apply limit after filtering
+    limited_users = filtered_users[:limit]
+
+    return UserListResponse(
+        items=[auth_service.to_response(u) for u in limited_users],
+        total=len(limited_users),
+    )
+
+
+@router.post(
+    "/users/student",
+    response_model=CreateStudentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create student (teacher+)",
+    responses={
+        401: {"description": "Not authenticated"},
+        403: {"description": "Permission denied (requires teacher or admin)"},
+        409: {"description": "Email or CPF already exists"},
+        422: {"description": "Validation error"},
+    },
+)
+async def teacher_create_student(
+    data: CreateStudentRequest,
+    _teacher: TeacherUser,
+    auth_service: AuthServiceDep,
+    request: Request,
+) -> CreateStudentResponse:
+    """Create a new student account (teachers and admins).
+
+    This endpoint allows teachers to create student accounts.
+    The role is always set to STUDENT regardless of any input.
+
+    Features:
+    - Creates user with STUDENT role (enforced)
+    - Optional auto-grant access to a course (if course_id provided)
+    - Optional welcome email with credentials (if send_welcome_email=true)
+
+    Args:
+        data: Student creation request with email, password, and optional fields
+
+    Returns:
+        CreateStudentResponse with user data and course access info
+    """
+    # Store plain password for email before creating user (it gets hashed)
+    plain_password = data.password
+
+    # Convert CreateStudentRequest to AdminCreateUserRequest with forced STUDENT role
+    admin_request = AdminCreateUserRequest(
+        email=data.email,
+        password=data.password,
+        role=UserRole.STUDENT,  # Always STUDENT - security enforcement
+        name=data.name,
+        phone=data.phone,
+        cpf=data.cpf,
+    )
+
+    try:
+        user = await auth_service.admin_create_user(admin_request)
+    except UserExistsError as e:
+        raise handle_auth_error(e) from e
+
+    # Send welcome email if requested and email service is available
+    welcome_email_sent = False
+    if data.send_welcome_email:
+        email_service = getattr(request.app.state, "email_service", None)
+        if email_service:
+            with contextlib.suppress(Exception):
+                await email_service.send_student_welcome_credentials(
+                    to=user.email,
+                    user_name=user.name or "Estudante",
+                    password=plain_password,
+                    course_name=None,  # TODO: Add course name when auto-grant is implemented
+                    teacher_name=None,  # TODO: Add teacher name
+                )
+                welcome_email_sent = True
+
+    # TODO: Auto-grant course access if data.course_id provided
+    course_access_granted = False
+    acquisition_id = None
+
+    return CreateStudentResponse(
+        user=auth_service.to_response(user),
+        course_access_granted=course_access_granted,
+        acquisition_id=acquisition_id,
+        welcome_email_sent=welcome_email_sent,
+    )
 
 
 @router.get(

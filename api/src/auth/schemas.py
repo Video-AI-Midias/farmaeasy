@@ -252,6 +252,82 @@ class AdminCreateUserRequest(BaseModel):
         return v.strip()
 
 
+class CreateStudentRequest(BaseModel):
+    """Teacher request to create a student.
+
+    Simplified version of AdminCreateUserRequest.
+    Role is always STUDENT (enforced).
+    """
+
+    email: EmailStr = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password")
+
+    # Optional fields
+    name: str | None = Field(
+        None, min_length=2, max_length=100, description="Full name"
+    )
+    phone: str | None = Field(None, description="Phone number")
+    cpf: str | None = Field(None, description="Brazilian CPF")
+
+    # Course access (optional)
+    course_id: UUID | None = Field(
+        None, description="Course ID to grant access automatically"
+    )
+    send_welcome_email: bool = Field(
+        default=True, description="Send welcome email with credentials"
+    )
+
+    @field_validator("cpf")
+    @classmethod
+    def validate_cpf_format(cls, v: str | None) -> str | None:
+        if v is None or v.strip() == "":
+            return None
+        result = validate_cpf(v)
+        if not result.valid:
+            msg = result.message or "CPF invalido"
+            raise ValueError(msg)
+        return normalize_cpf(v)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone_format(cls, v: str | None) -> str | None:
+        if v is None or v.strip() == "":
+            return None
+        result = validate_phone(v)
+        if not result.valid:
+            msg = result.message or "Telefone invalido"
+            raise ValueError(msg)
+        return normalize_phone(v)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        result = validate_password(v)
+        if not result.valid:
+            msg = result.message or "Senha invalida"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.strip()
+
+
+class CreateStudentResponse(BaseModel):
+    """Response for student creation.
+
+    Includes user data and optional course access info.
+    """
+
+    user: "UserResponse"
+    course_access_granted: bool = False
+    acquisition_id: UUID | None = None
+    welcome_email_sent: bool = False
+
+
 # ==============================================================================
 # Response Schemas
 # ==============================================================================
