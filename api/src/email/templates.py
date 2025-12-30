@@ -502,3 +502,145 @@ Este email não está mais associado à sua conta FarmaEasy.
 Este email foi enviado automaticamente, por favor não responda.
 """
     return html, plain_text.strip()
+
+
+# ==============================================================================
+# Template: Student Welcome (Created by Teacher)
+# ==============================================================================
+
+STUDENT_WELCOME_CONTENT = """
+<h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #1A1D23; line-height: 1.3;">
+  Bem-vindo ao FarmaEasy!
+</h1>
+
+<p style="margin: 0 0 24px; font-size: 16px; color: #4B5563; line-height: 1.6;">
+  Olá, <strong style="color: #1A1D23;">{user_name}</strong>!<br><br>
+  Sua conta foi criada com sucesso. Abaixo estão suas credenciais de acesso:
+</p>
+
+<!-- Credentials Box -->
+<div style="background-color: #F0FDF4; border: 2px solid #4A8F5B; border-radius: 12px; padding: 24px; margin: 24px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="padding: 8px 0;">
+        <p style="margin: 0; font-size: 14px; color: #4A8F5B; font-weight: 500;">
+          Email
+        </p>
+        <p style="margin: 4px 0 0; font-size: 18px; font-weight: 600; color: #2D6E3E;">
+          {email}
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 16px 0 8px; border-top: 1px solid #BBF7D0;">
+        <p style="margin: 0; font-size: 14px; color: #4A8F5B; font-weight: 500;">
+          Senha temporária
+        </p>
+        <p style="margin: 4px 0 0; font-size: 18px; font-weight: 600; color: #2D6E3E; font-family: 'Courier New', Courier, monospace;">
+          {password}
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- Warning Box -->
+<div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0;">
+  <p style="margin: 0; font-size: 14px; color: #92400E; line-height: 1.5;">
+    <strong>Importante:</strong> Recomendamos que você altere sua senha no primeiro acesso
+    para maior segurança.
+  </p>
+</div>
+
+{course_section}
+
+<p style="margin: 24px 0 0; font-size: 14px; color: #6B7280; line-height: 1.6;">
+  Acesse agora mesmo em <a href="https://farmaeasy.com.br" style="color: #4A8F5B; text-decoration: none; font-weight: 500;">farmaeasy.com.br</a>
+  e comece sua jornada de aprendizado!
+</p>
+"""
+
+STUDENT_WELCOME_COURSE_SECTION = """
+<!-- Course Access Box -->
+<div style="background-color: #EFF6FF; border-left: 4px solid #3B82F6; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0;">
+  <p style="margin: 0; font-size: 14px; color: #1E40AF; line-height: 1.5;">
+    <strong>Você já tem acesso ao curso:</strong> {course_name}<br>
+    <span style="color: #3B82F6;">Cadastrado por: {teacher_name}</span>
+  </p>
+</div>
+"""
+
+
+def render_student_welcome(
+    user_name: str,
+    email: str,
+    password: str,
+    course_name: str | None = None,
+    teacher_name: str | None = None,
+) -> tuple[str, str]:
+    """Render student welcome email with credentials.
+
+    Sent when a teacher creates a new student account.
+
+    Args:
+        user_name: Student's display name
+        email: Student's email address
+        password: Temporary password
+        course_name: Optional course name if auto-access was granted
+        teacher_name: Optional teacher name who created the account
+
+    Returns:
+        Tuple of (html_content, plain_text_content)
+    """
+    # Build course section if course info provided
+    if course_name and teacher_name:
+        course_section = STUDENT_WELCOME_COURSE_SECTION.format(
+            course_name=course_name,
+            teacher_name=teacher_name,
+        )
+    else:
+        course_section = ""
+
+    content = STUDENT_WELCOME_CONTENT.format(
+        user_name=user_name,
+        email=email,
+        password=password,
+        course_section=course_section,
+    )
+    html = BASE_TEMPLATE.format(
+        title="Bem-vindo ao FarmaEasy",
+        content=content,
+        year=datetime.now().year,
+    )
+
+    # Build plain text version
+    plain_text_base = f"""
+Bem-vindo ao FarmaEasy!
+
+Olá, {user_name}!
+
+Sua conta foi criada com sucesso. Abaixo estão suas credenciais de acesso:
+
+Email: {email}
+Senha temporária: {password}
+
+IMPORTANTE: Recomendamos que você altere sua senha no primeiro acesso
+para maior segurança.
+"""
+
+    if course_name and teacher_name:
+        plain_text_base += f"""
+ACESSO AO CURSO
+Você já tem acesso ao curso: {course_name}
+Cadastrado por: {teacher_name}
+"""
+
+    plain_text_base += f"""
+Acesse agora mesmo em farmaeasy.com.br e comece sua jornada de aprendizado!
+
+---
+© {datetime.now().year} FarmaEasy. Todos os direitos reservados.
+Este email foi enviado automaticamente, por favor não responda.
+"""
+
+    return html, plain_text_base.strip()

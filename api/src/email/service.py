@@ -580,3 +580,45 @@ Equipe FarmaEasy
             body_text=body_text,
             to_name=user_name,
         )
+
+    async def send_student_welcome_credentials(
+        self,
+        to: str,
+        user_name: str,
+        password: str,
+        course_name: str | None = None,
+        teacher_name: str | None = None,
+    ) -> SendEmailResponse:
+        """Send student welcome email with login credentials.
+
+        Sent when a teacher creates a new student account.
+        Includes the temporary password for first login.
+
+        Args:
+            to: Student email address
+            user_name: Student's display name
+            password: Temporary password for first login
+            course_name: Optional course name if auto-access was granted
+            teacher_name: Optional teacher name who created the account
+
+        Returns:
+            SendEmailResponse with success status
+        """
+        from src.email.templates import render_student_welcome
+
+        subject = "Bem-vindo ao FarmaEasy - Suas Credenciais de Acesso"
+        body_html, body_text = render_student_welcome(
+            user_name=user_name,
+            email=to,
+            password=password,
+            course_name=course_name,
+            teacher_name=teacher_name,
+        )
+
+        return await self.send_simple_email(
+            to=to,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            to_name=user_name,
+        )
