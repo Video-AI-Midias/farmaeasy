@@ -236,3 +236,32 @@ export interface ConfirmEmailChangeResponse {
   message: string;
   new_email: string | null;
 }
+
+// =============================================================================
+// Teacher Create Student Types
+// =============================================================================
+
+// Request to create a student (teacher+)
+export interface CreateStudentRequest {
+  email: string;
+  password: string;
+  name?: string | undefined;
+  phone?: string | undefined;
+  cpf?: string | undefined;
+  send_welcome_email?: boolean | undefined;
+  course_id?: string | undefined;
+}
+
+// Response from creating a student
+export interface CreateStudentResponse {
+  user: User;
+  course_access_granted: boolean;
+  acquisition_id?: string | undefined;
+  welcome_email_sent: boolean;
+}
+
+// Search users params for teachers (filtered to students/users only)
+export interface SearchUsersForTeacherParams {
+  search?: string | undefined;
+  limit?: number | undefined;
+}
