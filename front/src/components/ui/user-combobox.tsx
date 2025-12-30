@@ -34,6 +34,16 @@ interface UserComboboxProps {
   error?: string | undefined;
   disabled?: boolean;
   className?: string;
+  /**
+   * Use teacher API (returns only students/users).
+   * If false, uses admin API (all users with role filter).
+   * @default false
+   */
+  useTeacherApi?: boolean;
+  /**
+   * Render a custom action button in the empty state (e.g., "Create Student").
+   */
+  emptyStateAction?: React.ReactNode;
 }
 
 function getUserInitials(name: string | undefined): string {
@@ -56,6 +66,8 @@ export function UserCombobox({
   error,
   disabled = false,
   className,
+  useTeacherApi = false,
+  emptyStateAction,
 }: UserComboboxProps) {
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -69,7 +81,7 @@ export function UserCombobox({
     setSearchTerm,
     loadMore,
     reset,
-  } = useUserSearch(role ? { role } : {});
+  } = useUserSearch({ role, useTeacherApi });
 
   // Find selected user when value changes
   useEffect(() => {
@@ -190,8 +202,9 @@ export function UserCombobox({
                 )}
 
                 {!searchError && !isSearching && users.length === 0 && searchTerm.length >= 2 && (
-                  <div className="p-8 text-center text-sm text-muted-foreground">
-                    Nenhum usuario encontrado
+                  <div className="p-8 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">Nenhum usuario encontrado</p>
+                    {emptyStateAction}
                   </div>
                 )}
 
