@@ -6,17 +6,39 @@
  * - Progressive loading (load more results)
  * - Cache to avoid repeated requests
  * - Loading and error states
+ * - Support for admin API (full users) or teacher API (students/users only)
  */
 
-import { usersAdminApi } from "@/lib/users-api";
+import { usersAdminApi, usersApi } from "@/lib/users-api";
 import type { User, UserRole } from "@/types/auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseUserSearchOptions {
-  role?: UserRole;
+  /**
+   * Filter by role (only works with admin API).
+   */
+  role?: UserRole | undefined;
+  /**
+   * Minimum search term length before searching.
+   * @default 2
+   */
   minSearchLength?: number;
+  /**
+   * Debounce delay in milliseconds.
+   * @default 300
+   */
   debounceMs?: number;
+  /**
+   * Initial result limit.
+   * @default 20
+   */
   initialLimit?: number;
+  /**
+   * Use teacher API (returns only students/users).
+   * If false, uses admin API (all users with role filter).
+   * @default false
+   */
+  useTeacherApi?: boolean;
 }
 
 interface UseUserSearchReturn {
@@ -32,9 +54,23 @@ interface UseUserSearchReturn {
 
 /**
  * Hook for searching users with advanced features.
+ *
+ * @example
+ * // Admin: search all users with role filter
+ * const { users, setSearchTerm } = useUserSearch({ role: "student" });
+ *
+ * @example
+ * // Teacher: search students/users only
+ * const { users, setSearchTerm } = useUserSearch({ useTeacherApi: true });
  */
 export function useUserSearch(options: UseUserSearchOptions = {}): UseUserSearchReturn {
-  const { role, minSearchLength = 2, debounceMs = 300, initialLimit = 20 } = options;
+  const {
+    role,
+    minSearchLength = 2,
+    debounceMs = 300,
+    initialLimit = 20,
+    useTeacherApi = false,
+  } = options;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState<User[]>([]);
@@ -56,8 +92,9 @@ export function useUserSearch(options: UseUserSearchOptions = {}): UseUserSearch
         return;
       }
 
-      // Check cache first
-      const cacheKey = `${term}-${role || "all"}-${limit}`;
+      // Check cache first (include API type in cache key)
+      const apiType = useTeacherApi ? "teacher" : "admin";
+      const cacheKey = `${apiType}-${term}-${role || "all"}-${limit}`;
       const cached = cacheRef.current.get(cacheKey);
       if (cached) {
         setUsers(cached);
@@ -75,20 +112,30 @@ export function useUserSearch(options: UseUserSearchOptions = {}): UseUserSearch
       setError(null);
 
       try {
-        const params: Parameters<typeof usersAdminApi.searchUsers>[0] = {
-          limit,
-        };
+        let result: { items: User[]; total: number };
 
-        // Apenas adiciona search se não estiver vazio
-        if (term.length > 0) {
-          params.search = term;
+        if (useTeacherApi) {
+          // Teacher API: /auth/users/search (no role filter, backend handles it)
+          result = await usersApi.searchUsersForTeacher({
+            search: term.length > 0 ? term : undefined,
+            limit,
+          });
+        } else {
+          // Admin API: /auth/users (with optional role filter)
+          const params: Parameters<typeof usersAdminApi.searchUsers>[0] = {
+            limit,
+          };
+
+          if (term.length > 0) {
+            params.search = term;
+          }
+
+          if (role) {
+            params.role = role;
+          }
+
+          result = await usersAdminApi.searchUsers(params);
         }
-
-        if (role) {
-          params.role = role;
-        }
-
-        const result = await usersAdminApi.searchUsers(params);
 
         setUsers(result.items);
         setHasMore(result.items.length >= limit);
@@ -109,7 +156,7 @@ export function useUserSearch(options: UseUserSearchOptions = {}): UseUserSearch
         abortControllerRef.current = null;
       }
     },
-    [minSearchLength, role],
+    [minSearchLength, role, useTeacherApi],
   );
 
   // Debounced search
