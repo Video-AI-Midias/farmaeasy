@@ -1,16 +1,20 @@
 """Async Cassandra database connection using cassandra-asyncio-driver.
 
 Provides:
-- Async connection pool management
+- Async connection pool management with retry and exponential backoff
 - Session with aexecute() for non-blocking queries
 - Keyspace and table initialization (async)
+- Connection health check
 
 The cassandra-asyncio-driver extends the standard cassandra-driver
 with `session.aexecute()` method for async/await support.
 """
 
+import time
+
 import structlog
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import NoHostAvailable
 from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 from cassandra_asyncio.cluster import Cluster
 
@@ -25,6 +29,11 @@ from src.progress.models import PROGRESS_TABLES_CQL
 
 logger = structlog.get_logger(__name__)
 
+# Retry configuration
+MAX_RETRIES = 5
+INITIAL_BACKOFF_SECONDS = 2
+MAX_BACKOFF_SECONDS = 60
+
 
 class AsyncCassandraConnection:
     """Async Cassandra connection manager.
@@ -37,16 +46,21 @@ class AsyncCassandraConnection:
     _session = None  # Session type from cassandra_asyncio
 
     @classmethod
-    def connect(cls):
-        """Establish connection to Cassandra cluster.
+    def connect(cls, max_retries: int = MAX_RETRIES):
+        """Establish connection to Cassandra cluster with retry and backoff.
 
-        Note: Connection is synchronous, but execute calls can be async.
+        Implements exponential backoff to handle Cassandra startup delays.
+        This is critical for container orchestration where Cassandra may take
+        time to become fully available even after passing health checks.
+
+        Args:
+            max_retries: Maximum number of connection attempts (default: 5)
 
         Returns:
             Active Cassandra session with aexecute() support
 
         Raises:
-            ConnectionError: If connection fails
+            ConnectionError: If all connection attempts fail
         """
         if cls._session is not None:
             return cls._session
@@ -64,29 +78,54 @@ class AsyncCassandraConnection:
         # Load balancing policy
         load_balancing_policy = TokenAwarePolicy(DCAwareRoundRobinPolicy())
 
-        # Create async-capable cluster
-        cls._cluster = Cluster(
-            contact_points=settings.cassandra_hosts,
-            port=settings.cassandra_port,
-            auth_provider=auth_provider,
-            protocol_version=settings.cassandra_protocol_version,
-            load_balancing_policy=load_balancing_policy,
-            connect_timeout=settings.cassandra_connect_timeout,
+        last_error: Exception | None = None
+        backoff = INITIAL_BACKOFF_SECONDS
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Create async-capable cluster
+                cls._cluster = Cluster(
+                    contact_points=settings.cassandra_hosts,
+                    port=settings.cassandra_port,
+                    auth_provider=auth_provider,
+                    protocol_version=settings.cassandra_protocol_version,
+                    load_balancing_policy=load_balancing_policy,
+                    connect_timeout=settings.cassandra_connect_timeout,
+                )
+
+                cls._session = cls._cluster.connect()
+                logger.info(
+                    "async_cassandra_connected",
+                    hosts=settings.cassandra_hosts,
+                    port=settings.cassandra_port,
+                    protocol_version=settings.cassandra_protocol_version,
+                    attempts=attempt,
+                )
+                return cls._session
+
+            except (NoHostAvailable, OSError, ConnectionError) as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(
+                        "async_cassandra_connection_retry",
+                        attempt=attempt,
+                        max_retries=max_retries,
+                        backoff_seconds=backoff,
+                        error=str(e),
+                    )
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, MAX_BACKOFF_SECONDS)
+                else:
+                    logger.error(
+                        "async_cassandra_connection_failed",
+                        error=str(e),
+                        attempts=attempt,
+                    )
+
+        msg = (
+            f"Failed to connect to Cassandra after {max_retries} attempts: {last_error}"
         )
-
-        try:
-            cls._session = cls._cluster.connect()
-            logger.info(
-                "async_cassandra_connected",
-                hosts=settings.cassandra_hosts,
-                port=settings.cassandra_port,
-                protocol_version=settings.cassandra_protocol_version,
-            )
-        except Exception as e:
-            logger.error("async_cassandra_connection_failed", error=str(e))
-            raise ConnectionError(f"Failed to connect to Cassandra: {e}") from e
-
-        return cls._session
+        raise ConnectionError(msg) from last_error
 
     @classmethod
     def get_session(cls):
@@ -112,6 +151,25 @@ class AsyncCassandraConnection:
     def is_connected(cls) -> bool:
         """Check if connection is active."""
         return cls._session is not None and not cls._session.is_shutdown
+
+    @classmethod
+    async def health_check(cls) -> dict[str, bool | str]:
+        """Perform health check on Cassandra connection.
+
+        Returns:
+            Dict with health status and details
+        """
+        if not cls.is_connected():
+            return {"healthy": False, "error": "Not connected"}
+
+        try:
+            # Simple query to verify connection is working
+            result = await cls._session.aexecute("SELECT now() FROM system.local")
+            if result:
+                return {"healthy": True, "status": "connected"}
+            return {"healthy": False, "error": "Empty result"}
+        except Exception as e:
+            return {"healthy": False, "error": str(e)}
 
 
 def get_async_cassandra_session():
