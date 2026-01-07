@@ -19,9 +19,9 @@ dependencies = [
     "cassandra-driver>=3.29.0",
     "cassandra-asyncio-driver>=0.1.4",
     "redis>=5.2.0",
-    # Authentication & Authorization (submodules)
-    "authentication-module @ file:./modules/authentication/backend",
-    "authorization-module @ file:./modules/authorization/backend",
+    # Authentication & Authorization (submodules - paths defined in tool.uv.sources)
+    "authentication-module",
+    "authorization-module",
     "email-validator>=2.1.0",
     "cryptography>=46.0.3",
     # File Upload & Storage
@@ -71,6 +71,10 @@ dev = [
     "pre-commit>=4.0.0",
     "asgi-lifespan>=2.1.0",
 ]
+
+[tool.uv.sources]
+authentication-module = { path = "./modules/authentication/backend", editable = true }
+authorization-module = { path = "./modules/authorization/backend", editable = true }
 
 # ==============================================================================
 # RUFF CONFIGURATION
