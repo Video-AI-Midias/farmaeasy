@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "modules/authentication/frontend",
+    "modules/authorization/frontend"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",

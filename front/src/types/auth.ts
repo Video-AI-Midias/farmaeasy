@@ -1,182 +1,109 @@
 /**
  * Auth types for FarmaEasy frontend.
- * Mirrors backend schemas from src/auth/schemas.py
+ *
+ * Re-exports core types from authentication and authorization modules,
+ * plus application-specific extensions.
  */
 
-// User roles matching backend UserRole enum
-export type UserRole = "user" | "student" | "teacher" | "admin";
+// Re-export core types from modules
+export type {
+  UserRole,
+  Address,
+  User,
+  LoginRequest,
+  RegisterRequest,
+  TokenResponse,
+  AuthResponse,
+  ChangePasswordRequest,
+  UpdateProfileRequest,
+  AuthState,
+  AuthActions,
+  AuthStore,
+} from "@farmaeasy/authentication"
 
-// Address type
-export interface Address {
-  street?: string | undefined;
-  number?: string | undefined;
-  complement?: string | undefined;
-  neighborhood?: string | undefined;
-  city?: string | undefined;
-  state?: string | undefined;
-  zip_code?: string | undefined;
-}
+export { ROLE_HIERARCHY } from "@farmaeasy/authorization"
 
-// User entity returned by API
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  cpf?: string;
-  rg?: string;
-  phone?: string;
-  avatar_url?: string;
-  role: UserRole;
-  is_active: boolean;
-  address?: Address;
-  max_concurrent_sessions?: number;
-  created_at: string;
-  updated_at?: string;
-}
-
-// Login request
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-// Registration request
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  name: string;
-  cpf: string;
-  phone: string;
-}
-
-// Token response from API
-export interface TokenResponse {
-  access_token: string;
-  token_type: "Bearer";
-  expires_in: number;
-}
-
-// Auth response with user data
-export interface AuthResponse {
-  user: User;
-  tokens: TokenResponse;
-}
+// =============================================================================
+// Application-specific types (not in core modules)
+// =============================================================================
 
 // CPF validation request/response
 export interface ValidateCPFRequest {
-  cpf: string;
+  cpf: string
 }
 
 export interface ValidateCPFResponse {
-  valid: boolean;
-  formatted?: string;
-  available?: boolean;
+  valid: boolean
+  formatted?: string
+  available?: boolean
 }
 
 // Email validation request/response
 export interface ValidateEmailRequest {
-  email: string;
+  email: string
 }
 
 export interface ValidateEmailResponse {
-  available: boolean;
+  available: boolean
 }
-
-// Password change request
-export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
-}
-
-// Profile update request
-export interface UpdateProfileRequest {
-  name?: string;
-  phone?: string;
-  avatar_url?: string;
-}
-
-// Auth state for Zustand store
-export interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  isInitialized: boolean;
-}
-
-// Auth actions for Zustand store
-export interface AuthActions {
-  setUser: (user: User | null) => void;
-  setLoading: (loading: boolean) => void;
-  setInitialized: (initialized: boolean) => void;
-  login: (credentials: LoginRequest) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAuth: () => Promise<void>;
-  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
-  changePassword: (data: ChangePasswordRequest) => Promise<void>;
-  reset: () => void;
-}
-
-// Complete auth store type
-export type AuthStore = AuthState & AuthActions;
 
 // Users list response
 export interface UserListResponse {
-  items: User[];
-  total: number;
+  items: import("@farmaeasy/authentication").User[]
+  total: number
 }
 
 // Users list filters
 export interface UserListFilters {
-  search?: string;
-  role?: UserRole;
-  limit?: number;
+  search?: string
+  role?: import("@farmaeasy/authentication").UserRole
+  limit?: number
 }
 
 // Admin create user request
 export interface AdminCreateUserRequest {
-  email: string;
-  password: string;
-  role?: UserRole | undefined;
-  name?: string | undefined;
-  phone?: string | undefined;
-  cpf?: string | undefined;
-  rg?: string | undefined;
-  avatar_url?: string | undefined;
-  address?: Address | undefined;
+  email: string
+  password: string
+  role?: import("@farmaeasy/authentication").UserRole | undefined
+  name?: string | undefined
+  phone?: string | undefined
+  cpf?: string | undefined
+  rg?: string | undefined
+  avatar_url?: string | undefined
+  address?: import("@farmaeasy/authentication").Address | undefined
 }
 
 // Last lesson info for progress tracking
 export interface LastLessonInfo {
-  course_id?: string;
-  module_id?: string;
-  lesson_id?: string;
-  last_accessed_at?: string;
+  course_id?: string
+  module_id?: string
+  lesson_id?: string
+  last_accessed_at?: string
 }
 
 // User progress summary across all courses
 export interface UserProgressSummary {
-  total_courses_enrolled: number;
-  total_lessons_completed: number;
-  total_lessons_total: number;
-  total_watch_time_seconds: number;
-  last_lesson?: LastLessonInfo;
+  total_courses_enrolled: number
+  total_lessons_completed: number
+  total_lessons_total: number
+  total_watch_time_seconds: number
+  last_lesson?: LastLessonInfo
 }
 
 // User session information
 export interface UserSessionInfo {
-  active_sessions: number;
-  max_sessions: number;
-  first_access?: string;
-  last_access?: string;
+  active_sessions: number
+  max_sessions: number
+  first_access?: string
+  last_access?: string
 }
 
 // Extended user details for admin panel
 export interface UserDetailsResponse {
-  user: User;
-  session_info: UserSessionInfo;
-  progress: UserProgressSummary;
-  comments_count: number;
+  user: import("@farmaeasy/authentication").User
+  session_info: UserSessionInfo
+  progress: UserProgressSummary
+  comments_count: number
 }
 
 // =============================================================================
@@ -185,56 +112,56 @@ export interface UserDetailsResponse {
 
 // Password Reset - Forgot Password
 export interface ForgotPasswordRequest {
-  email: string;
+  email: string
 }
 
 export interface ForgotPasswordResponse {
-  message: string;
+  message: string
 }
 
 // Password Reset - Verify Code
 export interface VerifyCodeRequest {
-  email: string;
-  code: string;
+  email: string
+  code: string
 }
 
 export interface VerifyCodeResponse {
-  valid: boolean;
-  message: string;
+  valid: boolean
+  message: string
 }
 
 // Password Reset - Reset Password
 export interface ResetPasswordRequest {
-  email: string;
-  code: string;
-  new_password: string;
+  email: string
+  code: string
+  new_password: string
 }
 
 export interface ResetPasswordResponse {
-  success: boolean;
-  message: string;
+  success: boolean
+  message: string
 }
 
 // Email Change - Request
 export interface RequestEmailChangeRequest {
-  new_email: string;
-  password: string;
+  new_email: string
+  password: string
 }
 
 export interface RequestEmailChangeResponse {
-  message: string;
-  email_masked: string;
+  message: string
+  email_masked: string
 }
 
 // Email Change - Confirm
 export interface ConfirmEmailChangeRequest {
-  code: string;
+  code: string
 }
 
 export interface ConfirmEmailChangeResponse {
-  success: boolean;
-  message: string;
-  new_email: string | null;
+  success: boolean
+  message: string
+  new_email: string | null
 }
 
 // =============================================================================
@@ -243,25 +170,25 @@ export interface ConfirmEmailChangeResponse {
 
 // Request to create a student (teacher+)
 export interface CreateStudentRequest {
-  email: string;
-  password: string;
-  name?: string | undefined;
-  phone?: string | undefined;
-  cpf?: string | undefined;
-  send_welcome_email?: boolean | undefined;
-  course_id?: string | undefined;
+  email: string
+  password: string
+  name?: string | undefined
+  phone?: string | undefined
+  cpf?: string | undefined
+  send_welcome_email?: boolean | undefined
+  course_id?: string | undefined
 }
 
 // Response from creating a student
 export interface CreateStudentResponse {
-  user: User;
-  course_access_granted: boolean;
-  acquisition_id?: string | undefined;
-  welcome_email_sent: boolean;
+  user: import("@farmaeasy/authentication").User
+  course_access_granted: boolean
+  acquisition_id?: string | undefined
+  welcome_email_sent: boolean
 }
 
 // Search users params for teachers (filtered to students/users only)
 export interface SearchUsersForTeacherParams {
-  search?: string | undefined;
-  limit?: number | undefined;
+  search?: string | undefined
+  limit?: number | undefined
 }

@@ -1,30 +1,44 @@
 /**
  * Auth hooks for components.
  *
+ * Re-exports authorization utilities from @farmaeasy/authorization module.
+ * Provides:
  * - useAuth: Access auth state and actions
  * - useAuthInit: Initialize auth on app startup
  * - useRequireAuth: Redirect if not authenticated
  * - useRequireRole: Redirect if user doesn't have required role
+ * - usePermissions: Permission checking utilities (from authorization module)
  */
 
-import { useAuthStore } from "@/stores/auth";
-import type { UserRole } from "@/types/auth";
-import { useCallback, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/stores/auth"
+import type { UserRole } from "@/types/auth"
+import {
+  hasPermission,
+  isAdmin as checkIsAdmin,
+  isAtLeastStudent,
+  isAtLeastTeacher,
+  usePermissions,
+} from "@farmaeasy/authorization"
+import { useCallback, useEffect, useMemo } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 
-// Role hierarchy for permission checking
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  user: 0,
-  student: 1,
-  teacher: 2,
-  admin: 3,
-};
+// Re-export usePermissions for direct use
+export { usePermissions } from "@farmaeasy/authorization"
 
 /**
  * Main auth hook - provides auth state and actions
  */
 export function useAuth() {
-  const store = useAuthStore();
+  const store = useAuthStore()
+
+  const permissions = useMemo(() => {
+    const role = store.user?.role ?? "user"
+    return {
+      isAdmin: checkIsAdmin(role),
+      isTeacher: isAtLeastTeacher(role),
+      isStudent: isAtLeastStudent(role),
+    }
+  }, [store.user?.role])
 
   return {
     // State
@@ -40,22 +54,17 @@ export function useAuth() {
     updateProfile: store.updateProfile,
     changePassword: store.changePassword,
 
-    // Role helpers
+    // Role helpers (using authorization module)
     hasRole: useCallback(
       (role: UserRole) => {
-        if (!store.user) return false;
-        return ROLE_HIERARCHY[store.user.role] >= ROLE_HIERARCHY[role];
+        if (!store.user) return false
+        return hasPermission(store.user.role, role)
       },
       [store.user],
     ),
 
-    isAdmin: store.user?.role === "admin",
-    isTeacher: store.user?.role === "teacher" || store.user?.role === "admin",
-    isStudent:
-      store.user?.role === "student" ||
-      store.user?.role === "teacher" ||
-      store.user?.role === "admin",
-  };
+    ...permissions,
+  }
 }
 
 /**
@@ -63,16 +72,16 @@ export function useAuth() {
  * Call this once in App.tsx to restore session from refresh token.
  */
 export function useAuthInit() {
-  const refreshAuth = useAuthStore((state) => state.refreshAuth);
-  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const refreshAuth = useAuthStore((state) => state.refreshAuth)
+  const isInitialized = useAuthStore((state) => state.isInitialized)
 
   useEffect(() => {
     if (!isInitialized) {
-      refreshAuth();
+      refreshAuth()
     }
-  }, [refreshAuth, isInitialized]);
+  }, [refreshAuth, isInitialized])
 
-  return isInitialized;
+  return isInitialized
 }
 
 /**
@@ -80,9 +89,9 @@ export function useAuthInit() {
  * Returns true when auth check is complete and user is authenticated.
  */
 export function useRequireAuth(redirectTo = "/entrar") {
-  const { isAuthenticated, isInitialized, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { isAuthenticated, isInitialized, isLoading } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     if (isInitialized && !isLoading && !isAuthenticated) {
@@ -90,60 +99,60 @@ export function useRequireAuth(redirectTo = "/entrar") {
       navigate(redirectTo, {
         replace: true,
         state: { from: location.pathname },
-      });
+      })
     }
-  }, [isAuthenticated, isInitialized, isLoading, navigate, redirectTo, location.pathname]);
+  }, [isAuthenticated, isInitialized, isLoading, navigate, redirectTo, location.pathname])
 
   return {
     isReady: isInitialized && !isLoading && isAuthenticated,
     isLoading: !isInitialized || isLoading,
-  };
+  }
 }
 
 /**
  * Require specific role - redirects if user doesn't have permission.
  */
 export function useRequireRole(role: UserRole, redirectTo = "/nao-autorizado") {
-  const { user, isAuthenticated, isInitialized, isLoading, hasRole } = useAuth();
-  const navigate = useNavigate();
+  const { user, isAuthenticated, isInitialized, isLoading, hasRole } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (isInitialized && !isLoading) {
       if (!isAuthenticated) {
-        navigate("/entrar", { replace: true });
+        navigate("/entrar", { replace: true })
       } else if (!hasRole(role)) {
-        navigate(redirectTo, { replace: true });
+        navigate(redirectTo, { replace: true })
       }
     }
-  }, [isAuthenticated, isInitialized, isLoading, hasRole, role, navigate, redirectTo]);
+  }, [isAuthenticated, isInitialized, isLoading, hasRole, role, navigate, redirectTo])
 
   return {
     isReady: isInitialized && !isLoading && isAuthenticated && hasRole(role),
     isLoading: !isInitialized || isLoading,
     user,
-  };
+  }
 }
 
 /**
  * Redirect authenticated users away from public pages (login, register).
  */
 export function useRedirectIfAuthenticated(redirectTo = "/painel") {
-  const { isAuthenticated, isInitialized, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { isAuthenticated, isInitialized, isLoading } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     if (isInitialized && !isLoading && isAuthenticated) {
       // Redirect to saved location or default
-      const from = (location.state as { from?: string })?.from ?? redirectTo;
-      navigate(from, { replace: true });
+      const from = (location.state as { from?: string })?.from ?? redirectTo
+      navigate(from, { replace: true })
     }
-  }, [isAuthenticated, isInitialized, isLoading, navigate, redirectTo, location.state]);
+  }, [isAuthenticated, isInitialized, isLoading, navigate, redirectTo, location.state])
 
   return {
     isReady: isInitialized && !isLoading,
     isAuthenticated,
-  };
+  }
 }
 
-export default useAuth;
+export default useAuth
