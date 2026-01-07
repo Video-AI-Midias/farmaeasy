@@ -8,7 +8,7 @@
   },
   "files": {
     "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.css", "*.json"],
-    "ignore": ["node_modules", "dist", "coverage", "*.config.ts"]
+    "ignore": ["node_modules", "dist", "coverage", "*.config.ts", "modules"]
   },
   "formatter": {
     "enabled": true,
