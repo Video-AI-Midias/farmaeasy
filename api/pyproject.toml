@@ -266,3 +266,4 @@ output = "coverage.xml"
 paths_to_mutate = "src/"
 tests_dir = "tests/"
 runner = "python -m pytest -x -q --tb=no"
+
