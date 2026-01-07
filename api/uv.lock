@@ -94,6 +94,48 @@ wheels = [
 ]
 
 [[package]]
+name = "authentication-module"
+version = "0.1.0"
+source = { editable = "modules/authentication/backend" }
+dependencies = [
+    { name = "argon2-cffi" },
+    { name = "pydantic" },
+    { name = "pyjwt" },
+    { name = "python-jose", extra = ["cryptography"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "argon2-cffi", specifier = ">=23.1.0" },
+    { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.115.0" },
+    { name = "pydantic", specifier = ">=2.10.0" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
+    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+]
+provides-extras = ["fastapi", "dev"]
+
+[[package]]
+name = "authorization-module"
+version = "0.1.0"
+source = { editable = "modules/authorization/backend" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.115.0" },
+    { name = "pydantic", specifier = ">=2.10.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+]
+provides-extras = ["fastapi", "dev"]
+
+[[package]]
 name = "brotli"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -568,7 +610,8 @@ name = "farmaeasy-api"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "argon2-cffi" },
+    { name = "authentication-module" },
+    { name = "authorization-module" },
     { name = "cassandra-asyncio-driver" },
     { name = "cassandra-driver" },
     { name = "cryptography" },
@@ -582,7 +625,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
-    { name = "python-jose", extra = ["cryptography"] },
     { name = "python-multipart" },
     { name = "redis" },
     { name = "starlette-compress" },
@@ -622,8 +664,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "argon2-cffi", specifier = ">=23.1.0" },
     { name = "asgi-lifespan", marker = "extra == 'dev'", specifier = ">=2.1.0" },
+    { name = "authentication-module", editable = "modules/authentication/backend" },
+    { name = "authorization-module", editable = "modules/authorization/backend" },
     { name = "cassandra-asyncio-driver", specifier = ">=0.1.4" },
     { name = "cassandra-driver", specifier = ">=3.29.0" },
     { name = "cryptography", specifier = ">=46.0.3" },
@@ -646,7 +689,6 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "redis", specifier = ">=5.2.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
