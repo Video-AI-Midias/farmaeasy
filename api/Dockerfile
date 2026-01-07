@@ -23,6 +23,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 # Copy dependency files first (for cache optimization)
 COPY pyproject.toml uv.lock ./
 
+# Copy submodules (required for uv sync to resolve local path dependencies)
+COPY modules/ ./modules/
+
 # Install dependencies without the project itself
 # This layer is cached unless pyproject.toml or uv.lock changes
 RUN --mount=type=cache,target=/root/.cache/uv \
