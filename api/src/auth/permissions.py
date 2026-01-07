@@ -20,6 +20,7 @@ from authorization.permissions import (
     is_teacher,
 )
 
+
 __all__ = [
     "ROLE_HIERARCHY",
     "UserRole",
