@@ -53,7 +53,8 @@ def create_access_token(
         data=data,
         secret_key=settings.auth_secret_key,
         algorithm=settings.auth_algorithm,
-        expires_delta=expires_delta or timedelta(minutes=settings.auth_access_token_expire_minutes),
+        expires_delta=expires_delta
+        or timedelta(minutes=settings.auth_access_token_expire_minutes),
     )
 
 
@@ -67,7 +68,8 @@ def create_refresh_token(
         data=data,
         secret_key=settings.auth_secret_key,
         algorithm=settings.auth_algorithm,
-        expires_delta=expires_delta or timedelta(days=settings.auth_refresh_token_expire_days),
+        expires_delta=expires_delta
+        or timedelta(days=settings.auth_refresh_token_expire_days),
     )
 
 
