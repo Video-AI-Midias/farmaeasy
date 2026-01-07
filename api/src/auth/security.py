@@ -11,9 +11,9 @@ from datetime import timedelta
 from typing import Any
 
 from authentication import (
+    get_token_expiration,
     hash_password,
     verify_password,
-    get_token_expiration,
 )
 from authentication.security import (
     create_access_token as _create_access_token,
@@ -27,13 +27,13 @@ from src.config.settings import get_settings
 
 # Re-export password functions directly (no settings needed)
 __all__ = [
-    "hash_password",
-    "verify_password",
     "create_access_token",
     "create_refresh_token",
     "decode_access_token",
     "decode_refresh_token",
     "get_token_expiration",
+    "hash_password",
+    "verify_password",
 ]
 
 

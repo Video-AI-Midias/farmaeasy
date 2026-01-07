@@ -93,6 +93,7 @@ exclude = [
     "htmlcov",
     "dist",
     "build",
+    "modules",
 ]
 
 [tool.ruff.lint]
