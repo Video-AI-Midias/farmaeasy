@@ -1,0 +1,9 @@
+{
+  "name": "farmaeasy-monorepo",
+  "private": true,
+  "workspaces": [
+    "front",
+    "modules/authentication/frontend",
+    "modules/authorization/frontend"
+  ]
+}

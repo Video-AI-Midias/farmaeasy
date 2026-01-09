@@ -1,12 +1,8 @@
-[submodule "api/modules/authentication"]
-	path = api/modules/authentication
+[submodule "modules/authentication"]
+	path = modules/authentication
 	url = git@github.com:Video-AI-Midias/authentication-module.git
-[submodule "api/modules/authorization"]
-	path = api/modules/authorization
+	branch = main
+[submodule "modules/authorization"]
+	path = modules/authorization
 	url = git@github.com:Video-AI-Midias/authorization-module.git
-[submodule "front/modules/authentication"]
-	path = front/modules/authentication
-	url = git@github.com:Video-AI-Midias/authentication-module.git
-[submodule "front/modules/authorization"]
-	path = front/modules/authorization
-	url = git@github.com:Video-AI-Midias/authorization-module.git
+	branch = main

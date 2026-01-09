@@ -73,8 +73,8 @@ dev = [
 ]
 
 [tool.uv.sources]
-authentication-module = { path = "./modules/authentication/backend", editable = true }
-authorization-module = { path = "./modules/authorization/backend", editable = true }
+authentication-module = { path = "../modules/authentication/backend", editable = true }
+authorization-module = { path = "../modules/authorization/backend", editable = true }
 
 # ==============================================================================
 # RUFF CONFIGURATION
