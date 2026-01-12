@@ -241,10 +241,11 @@ jobs:
             blue-green-deploy.sh \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/
 
-          # Sync nginx production config (create dir if needed)
+          # Sync nginx production configs (create dir if needed)
           ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.REMOTE_DIR }}/docker/nginx"
           rsync -avz \
             docker/nginx/nginx-prod.conf \
+            docker/nginx/farmaeasy-upstream.conf \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_DIR }}/docker/nginx/
 
           # Sync API .env file (if not exists on server, copy from example)
@@ -305,24 +306,42 @@ jobs:
             export IMAGE_NAME="$IMAGE_NAME"
             export IMAGE_TAG="$IMAGE_TAG"
 
-            # Update nginx config if changed (with backup and validation)
+            # =================================================================
+            # Update nginx upstream config (shared by all sites)
+            # IMPORTANTE: O upstream é gerenciado pelo blue-green-deploy.sh
+            # Só sincronizamos se o arquivo não existir no servidor
+            # =================================================================
+            UPSTREAM_SRC="${{ env.REMOTE_DIR }}/docker/nginx/farmaeasy-upstream.conf"
+            UPSTREAM_DEST="/etc/nginx/conf.d/farmaeasy-upstream.conf"
+            if [ -f "\$UPSTREAM_SRC" ] && [ ! -f "\$UPSTREAM_DEST" ]; then
+              echo "Creating initial nginx upstream configuration..."
+              sudo cp "\$UPSTREAM_SRC" "\$UPSTREAM_DEST"
+              echo "Upstream config created at \$UPSTREAM_DEST"
+            else
+              echo "Upstream config already exists, managed by blue-green-deploy.sh"
+            fi
+
+            # Update nginx site config if changed (with backup and validation)
             NGINX_SRC="${{ env.REMOTE_DIR }}/docker/nginx/nginx-prod.conf"
             NGINX_DEST="/etc/nginx/sites-available/api.farmaeasy.com.br"
             if [ -f "\$NGINX_SRC" ]; then
               if ! diff -q "\$NGINX_SRC" "\$NGINX_DEST" > /dev/null 2>&1; then
-                echo "Updating nginx configuration..."
-                sudo cp "\$NGINX_DEST" "\$NGINX_DEST.bak.\$(date +%Y%m%d_%H%M%S)"
+                echo "Updating nginx site configuration..."
+                sudo cp "\$NGINX_DEST" "\$NGINX_DEST.bak.\$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
                 sudo cp "\$NGINX_SRC" "\$NGINX_DEST"
                 if sudo nginx -t; then
                   sudo nginx -s reload
                   echo "Nginx configuration updated successfully"
                 else
                   echo "Nginx config invalid, restoring backup..."
-                  sudo cp "\$NGINX_DEST.bak.*" "\$NGINX_DEST" 2>/dev/null || true
+                  LATEST_BACKUP=\$(ls -t "\$NGINX_DEST.bak."* 2>/dev/null | head -1)
+                  if [ -n "\$LATEST_BACKUP" ]; then
+                    sudo cp "\$LATEST_BACKUP" "\$NGINX_DEST"
+                  fi
                   sudo nginx -s reload
                 fi
               else
-                echo "Nginx configuration unchanged, skipping update"
+                echo "Nginx site configuration unchanged, skipping update"
               fi
             fi
 
@@ -435,15 +454,27 @@ jobs:
             dist/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/var/www/html/treinamento.farmaeasy.com.br/
 
           # Update nginx config for treinamento (with backup and validation)
+          # IMPORTANTE: Este arquivo usa o upstream compartilhado farmaeasy_api
           NGINX_SRC="docker/nginx/treinamento-prod.conf"
-          NGINX_DEST="/etc/nginx/sites-available/treinamento.farmaeasy.com.br"
+          UPSTREAM_SRC="docker/nginx/farmaeasy-upstream.conf"
           if [ -f "$NGINX_SRC" ]; then
-            # First sync the config file to server
+            # First sync the config files to server
             rsync -avz "$NGINX_SRC" ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/treinamento-prod.conf
+            rsync -avz "$UPSTREAM_SRC" ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/farmaeasy-upstream.conf
 
             # Then apply if changed
             ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'NGINX_EOF'
               set -e
+
+              # Ensure upstream config exists (required by treinamento)
+              UPSTREAM_DEST="/etc/nginx/conf.d/farmaeasy-upstream.conf"
+              if [ ! -f "$UPSTREAM_DEST" ]; then
+                echo "Creating initial nginx upstream configuration..."
+                sudo cp /tmp/farmaeasy-upstream.conf "$UPSTREAM_DEST"
+                echo "Upstream config created at $UPSTREAM_DEST"
+              fi
+
+              # Update treinamento site config
               NGINX_DEST="/etc/nginx/sites-available/treinamento.farmaeasy.com.br"
               if ! diff -q /tmp/treinamento-prod.conf "$NGINX_DEST" > /dev/null 2>&1; then
                 echo "Updating treinamento nginx configuration..."
@@ -463,7 +494,7 @@ jobs:
               else
                 echo "Nginx configuration unchanged, skipping update"
               fi
-              rm -f /tmp/treinamento-prod.conf
+              rm -f /tmp/treinamento-prod.conf /tmp/farmaeasy-upstream.conf
           NGINX_EOF
           fi
 
