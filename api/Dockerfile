@@ -21,10 +21,10 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/app/.venv
 
 # Copy dependency files first (for cache optimization)
-COPY pyproject.toml uv.lock ./
+COPY api/pyproject.toml api/uv.lock ./
 
-# Copy submodules (required for uv sync to resolve local path dependencies)
-COPY modules/ ./modules/
+# Copy submodules to /modules (matches pyproject.toml path: ../modules relative to /app)
+COPY modules/ /modules/
 
 # Install dependencies without the project itself
 # This layer is cached unless pyproject.toml or uv.lock changes
@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
 
 # Copy source code
-COPY . /app
+COPY api/ /app/
 
 # Install the project (separate layer for better caching)
 RUN --mount=type=cache,target=/root/.cache/uv \

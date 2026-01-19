@@ -96,7 +96,7 @@ wheels = [
 [[package]]
 name = "authentication-module"
 version = "0.1.0"
-source = { editable = "modules/authentication/backend" }
+source = { editable = "../modules/authentication/backend" }
 dependencies = [
     { name = "argon2-cffi" },
     { name = "pydantic" },
@@ -120,7 +120,7 @@ provides-extras = ["fastapi", "dev"]
 [[package]]
 name = "authorization-module"
 version = "0.1.0"
-source = { editable = "modules/authorization/backend" }
+source = { editable = "../modules/authorization/backend" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -665,8 +665,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asgi-lifespan", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "authentication-module", editable = "modules/authentication/backend" },
-    { name = "authorization-module", editable = "modules/authorization/backend" },
+    { name = "authentication-module", editable = "../modules/authentication/backend" },
+    { name = "authorization-module", editable = "../modules/authorization/backend" },
     { name = "cassandra-asyncio-driver", specifier = ">=0.1.4" },
     { name = "cassandra-driver", specifier = ">=3.29.0" },
     { name = "cryptography", specifier = ">=46.0.3" },

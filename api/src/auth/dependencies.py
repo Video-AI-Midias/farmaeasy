@@ -4,8 +4,10 @@ Provides dependency injection for:
 - Current user extraction from JWT
 - Role-based access control
 - Permission checks
+- API Key authentication for integrations
 """
 
+import secrets
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -14,7 +16,7 @@ from jose import JWTError
 from src.auth.permissions import UserRole, has_permission
 from src.auth.schemas import UserResponse
 from src.auth.security import decode_access_token
-from src.config.settings import get_settings
+from src.config.settings import Settings, get_settings
 from src.core.context import set_user_id
 
 
@@ -263,3 +265,56 @@ ClientInfo = Annotated[tuple[str | None, str | None], Depends(get_client_info)]
 
 # Refresh token from cookie
 RefreshTokenCookie = Annotated[str | None, Depends(get_refresh_token_from_cookie)]
+
+
+# ==============================================================================
+# API Key Authentication (for integration endpoints)
+# ==============================================================================
+
+
+async def verify_master_api_key(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> str:
+    """Verify X-API-Key header against master API key.
+
+    Used for integration endpoints that don't require user authentication.
+
+    Args:
+        request: FastAPI request
+        settings: Application settings
+
+    Returns:
+        The validated API key
+
+    Raises:
+        HTTPException(401): If API key is missing
+        HTTPException(403): If API key is invalid
+        HTTPException(503): If API key is not configured
+    """
+    api_key = request.headers.get("X-API-Key")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key required",
+        )
+
+    if not settings.master_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API Key authentication not configured",
+        )
+
+    # Timing-safe comparison to prevent timing attacks
+    if not secrets.compare_digest(api_key, settings.master_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API Key",
+        )
+
+    return api_key
+
+
+# Master API Key dependency
+MasterApiKey = Annotated[str, Depends(verify_master_api_key)]

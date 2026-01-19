@@ -5,11 +5,15 @@ on:
     branches: [main, dev]
     paths:
       - "front/**"
+      - "modules/**/frontend/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/front-ci.yml"
   pull_request:
     branches: [main, dev]
     paths:
       - "front/**"
+      - "modules/**/frontend/**"
   workflow_dispatch:
 
 permissions:
@@ -19,10 +23,6 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-defaults:
-  run:
-    working-directory: front
 
 jobs:
   lint:
@@ -42,16 +42,16 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: front/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run Biome Lint
-        run: npm run lint
+        run: npm run lint -w front
 
       - name: Run TypeScript Check
-        run: npm run typecheck
+        run: npm run typecheck -w front
 
   test:
     name: Tests
@@ -71,13 +71,13 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: front/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run Tests
-        run: npm run test -- --run
+        run: npm run test -w front -- --run
 
   build:
     name: Build
@@ -97,13 +97,13 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: front/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npm run build -w front
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

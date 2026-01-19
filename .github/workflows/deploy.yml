@@ -366,10 +366,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    defaults:
-      run:
-        working-directory: front
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -382,22 +378,22 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: front/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run Biome Lint
-        run: npm run lint
+        run: npm run lint -w front
 
       - name: Run TypeScript Check
-        run: npm run typecheck
+        run: npm run typecheck -w front
 
       - name: Run Tests
-        run: npm run test -- --run
+        run: npm run test -w front -- --run
 
       - name: Build
-        run: npm run build
+        run: npm run build -w front
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

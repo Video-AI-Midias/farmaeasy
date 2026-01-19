@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@farmaeasy/authorization": path.resolve(__dirname, "../modules/authorization/frontend/src"),
     },
   },
   server: {
