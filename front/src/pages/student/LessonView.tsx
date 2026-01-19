@@ -449,11 +449,11 @@ function VideoContent({
     onComplete?.();
   }, [onComplete]);
 
-  // Video progress tracking - WITH onComplete at 100% threshold
-  // Video ends → handleVideoEnded (backup) OR 100% progress → both trigger completion
+  // Video progress tracking - WITH onComplete at 90% threshold
+  // Video ends → handleVideoEnded (backup) OR 90% progress → both trigger completion
   const { updateProgress } = useVideoProgress(lesson.id, courseId, moduleId, {
     onComplete: handleCompletion,
-    completionThreshold: 100,
+    completionThreshold: 90,
   });
 
   // Track if we've set the start time
@@ -635,7 +635,7 @@ function TextContent({
       <CardContent className="pt-6">
         {lesson.description ? (
           <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
-            {lesson.description}
+            {renderTextWithLinks(lesson.description)}
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
