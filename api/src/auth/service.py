@@ -142,8 +142,11 @@ class AuthService:
             (id, email, cpf, rg, phone, name, password_hash, role, is_active,
              avatar_url, address_street, address_number, address_complement,
              address_neighborhood, address_city, address_state, address_zip_code,
-             created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             created_at, updated_at,
+             cnpj, store_type, business_model, units_count, erp_system,
+             instagram, monthly_revenue, birth_date, registration_link_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """)
         self._update_user = self.session.prepare(f"""
             UPDATE {self.keyspace}.users
@@ -329,6 +332,121 @@ class AuthService:
         await self._insert_user_to_db(user)
         return user
 
+    async def create_user(
+        self,
+        email: str,
+        password: str,
+        name: str,
+        phone: str = "",
+        cpf: str | None = None,
+        rg: str | None = None,
+        role: str = UserRole.USER.value,
+        avatar_url: str | None = None,
+        address_street: str | None = None,
+        address_number: str | None = None,
+        address_complement: str | None = None,
+        address_neighborhood: str | None = None,
+        address_city: str | None = None,
+        address_state: str | None = None,
+        address_zip_code: str | None = None,
+        # Company fields
+        cnpj: str | None = None,
+        store_type: str | None = None,
+        business_model: str | None = None,
+        units_count: int | None = None,
+        erp_system: str | None = None,
+        instagram: str | None = None,
+        monthly_revenue: str | None = None,
+        birth_date=None,
+        registration_link_id=None,
+    ) -> User:
+        """Create a new user with all fields.
+
+        This method is used by registration links to create users
+        with company information.
+
+        Args:
+            email: User email
+            password: Plain text password (will be hashed)
+            name: Full name
+            phone: Phone number
+            cpf: Brazilian CPF
+            rg: Brazilian RG
+            role: User role
+            avatar_url: Profile picture URL
+            address_*: Address fields
+            cnpj: Company CNPJ
+            store_type: Type of store
+            business_model: Business model
+            units_count: Number of units
+            erp_system: ERP system name
+            instagram: Instagram handle
+            monthly_revenue: Monthly revenue range
+            birth_date: Birth date
+            registration_link_id: ID of registration link used
+
+        Returns:
+            Created User instance
+
+        Raises:
+            UserExistsError: If email or CPF already exists
+        """
+        # Check email uniqueness
+        if await self.get_user_by_email(email):
+            raise UserExistsError("Email ja cadastrado", field="email")
+
+        # Check CPF uniqueness (if provided)
+        if cpf and await self.get_user_by_cpf(cpf):
+            raise UserExistsError("CPF ja cadastrado", field="cpf")
+
+        # Create user
+        user = User(
+            email=email,
+            cpf=cpf,
+            rg=rg,
+            phone=phone,
+            name=name,
+            password_hash=hash_password(password),
+            role=role,
+            is_active=True,
+            avatar_url=avatar_url,
+            address_street=address_street,
+            address_number=address_number,
+            address_complement=address_complement,
+            address_neighborhood=address_neighborhood,
+            address_city=address_city,
+            address_state=address_state,
+            address_zip_code=address_zip_code,
+            cnpj=cnpj,
+            store_type=store_type,
+            business_model=business_model,
+            units_count=units_count,
+            erp_system=erp_system,
+            instagram=instagram,
+            monthly_revenue=monthly_revenue,
+            birth_date=birth_date,
+            registration_link_id=registration_link_id,
+        )
+
+        await self._insert_user_to_db(user)
+        return user
+
+    def create_access_token(self, user: User) -> str:
+        """Create an access token for a user.
+
+        Args:
+            user: User to create token for
+
+        Returns:
+            JWT access token string
+        """
+        payload = {
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+        }
+        return create_access_token(payload)
+
     async def _insert_user_to_db(self, user: User) -> None:
         """Insert user into database."""
         await self.session.aexecute(
@@ -353,6 +471,16 @@ class AuthService:
                 user.address_zip_code,
                 user.created_at,
                 user.updated_at,
+                # Company fields
+                user.cnpj,
+                user.store_type,
+                user.business_model,
+                user.units_count,
+                user.erp_system,
+                user.instagram,
+                user.monthly_revenue,
+                user.birth_date,
+                user.registration_link_id,
             ],
         )
 

@@ -195,6 +195,24 @@ class Settings(BaseSettings):
         default=30, description="Maximum uploads per minute per user"
     )
 
+    # Registration Links
+    master_api_key: str | None = Field(
+        default=None,
+        description="Master API Key for integration endpoints (keep secret!)",
+    )
+    registration_link_default_expiry_days: int = Field(
+        default=7,
+        description="Default expiration for registration links (days)",
+    )
+    registration_link_max_expiry_days: int = Field(
+        default=30,
+        description="Maximum expiration for registration links (days)",
+    )
+    registration_link_base_url: str = Field(
+        default="https://farmaeasy.com.br/cadastrar",
+        description="Base URL for registration links",
+    )
+
     # Email (Gmail API)
     email_enabled: bool = Field(
         default=False, description="Enable email sending via Gmail API"

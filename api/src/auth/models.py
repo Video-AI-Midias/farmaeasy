@@ -9,7 +9,7 @@ Note: Uses cassandra-driver directly (not ORM) for flexibility.
 Tables are created via CQL statements in the database module.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -38,7 +38,17 @@ CREATE TABLE IF NOT EXISTS {keyspace}.users (
     address_zip_code TEXT,
     max_concurrent_sessions INT,
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    -- Company fields (added for registration links)
+    cnpj TEXT,
+    store_type TEXT,
+    business_model TEXT,
+    units_count INT,
+    erp_system TEXT,
+    instagram TEXT,
+    monthly_revenue TEXT,
+    birth_date DATE,
+    registration_link_id UUID
 )
 """
 
@@ -48,6 +58,10 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON {keyspace}.users (email)
 
 USER_CPF_INDEX_CQL = """
 CREATE INDEX IF NOT EXISTS users_cpf_idx ON {keyspace}.users (cpf)
+"""
+
+USER_CNPJ_INDEX_CQL = """
+CREATE INDEX IF NOT EXISTS users_cnpj_idx ON {keyspace}.users (cnpj)
 """
 
 USER_NAME_INDEX_CQL = """
@@ -88,6 +102,7 @@ AUTH_TABLES_CQL = [
     USER_TABLE_CQL,
     USER_EMAIL_INDEX_CQL,
     USER_CPF_INDEX_CQL,
+    USER_CNPJ_INDEX_CQL,
     USER_NAME_INDEX_CQL,
     REFRESH_TOKEN_TABLE_CQL,
     REFRESH_TOKEN_USER_INDEX_CQL,
@@ -122,6 +137,15 @@ class User:
         max_concurrent_sessions: Max allowed concurrent sessions (None = use default)
         created_at: Account creation timestamp
         updated_at: Last update timestamp
+        cnpj: Brazilian CNPJ for companies
+        store_type: Type of store (associada, independente)
+        business_model: Business model (farmacia, manipulacao, ecommerce)
+        units_count: Number of store units
+        erp_system: ERP system name
+        instagram: Instagram handle
+        monthly_revenue: Monthly revenue range
+        birth_date: User's birth date
+        registration_link_id: ID of registration link used for signup
     """
 
     def __init__(
@@ -146,6 +170,16 @@ class User:
         max_concurrent_sessions: int | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
+        # Company fields
+        cnpj: str | None = None,
+        store_type: str | None = None,
+        business_model: str | None = None,
+        units_count: int | None = None,
+        erp_system: str | None = None,
+        instagram: str | None = None,
+        monthly_revenue: str | None = None,
+        birth_date: date | None = None,
+        registration_link_id: UUID | None = None,
     ):
         self.id = id or uuid4()
         self.email = email.lower().strip()
@@ -167,6 +201,16 @@ class User:
         self.max_concurrent_sessions = max_concurrent_sessions
         self.created_at = ensure_utc_aware(created_at) or datetime.now(UTC)
         self.updated_at = ensure_utc_aware(updated_at)
+        # Company fields
+        self.cnpj = cnpj
+        self.store_type = store_type
+        self.business_model = business_model
+        self.units_count = units_count
+        self.erp_system = erp_system
+        self.instagram = instagram
+        self.monthly_revenue = monthly_revenue
+        self.birth_date = birth_date
+        self.registration_link_id = registration_link_id
 
     @classmethod
     def from_row(cls, row: Any) -> "User":
@@ -192,6 +236,16 @@ class User:
             max_concurrent_sessions=getattr(row, "max_concurrent_sessions", None),
             created_at=row.created_at,
             updated_at=row.updated_at,
+            # Company fields
+            cnpj=getattr(row, "cnpj", None),
+            store_type=getattr(row, "store_type", None),
+            business_model=getattr(row, "business_model", None),
+            units_count=getattr(row, "units_count", None),
+            erp_system=getattr(row, "erp_system", None),
+            instagram=getattr(row, "instagram", None),
+            monthly_revenue=getattr(row, "monthly_revenue", None),
+            birth_date=getattr(row, "birth_date", None),
+            registration_link_id=getattr(row, "registration_link_id", None),
         )
 
     def to_dict(self, include_password: bool = False) -> dict[str, Any]:
@@ -216,6 +270,16 @@ class User:
             "max_concurrent_sessions": self.max_concurrent_sessions,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            # Company fields
+            "cnpj": self.cnpj,
+            "store_type": self.store_type,
+            "business_model": self.business_model,
+            "units_count": self.units_count,
+            "erp_system": self.erp_system,
+            "instagram": self.instagram,
+            "monthly_revenue": self.monthly_revenue,
+            "birth_date": self.birth_date,
+            "registration_link_id": self.registration_link_id,
         }
         if include_password:
             data["password_hash"] = self.password_hash
