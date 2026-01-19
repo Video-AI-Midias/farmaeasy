@@ -158,8 +158,9 @@ ignore = [
 "src/auth/verification.py" = ["S608"]  # CQL queries with keyspace from settings
 "src/auth/verification_router.py" = ["S608"]  # CQL queries
 "src/auth/verification_schemas.py" = ["S105"]  # Email template variables
-# Courses module - CQL statements and global service getters pattern
-"src/courses/models.py" = ["S608"]  # CQL table creation strings
+# Courses module - CQL statements, lazy imports, and global service getters pattern
+"src/courses/models.py" = ["S608", "PLC0415"]  # CQL table creation strings, lazy import for URL validation
+"src/courses/schemas.py" = ["PLC0415"]  # Lazy imports for embed URL validation
 "src/courses/service.py" = ["S608", "RET505"]  # CQL prepared statements
 "src/courses/dependencies.py" = ["PLW0603"]  # Global service getter pattern (same as auth)
 # Comments module - CQL statements

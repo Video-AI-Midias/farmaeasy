@@ -35,6 +35,32 @@ class ContentType(str, Enum):
     TEXT = "text"
     QUIZ = "quiz"
     PDF = "pdf"
+    EMBED = "embed"  # External embed (iframe) - e.g., Gamma, Canva, Google Slides
+
+
+# Allowed domains for EMBED content type (security whitelist)
+ALLOWED_EMBED_DOMAINS = [
+    "gamma.app",
+    "canva.com",
+    "docs.google.com",
+    "slides.google.com",
+    "drive.google.com",
+    "figma.com",
+    "miro.com",
+    "notion.so",
+    "prezi.com",
+    "slideshare.net",
+    "youtube.com",
+    "youtube-nocookie.com",
+    "vimeo.com",
+    "loom.com",
+    "genially.com",
+    "padlet.com",
+    "mentimeter.com",
+    "kahoot.it",
+    "typeform.com",
+    "jotform.com",
+]
 
 
 # ==============================================================================
@@ -487,6 +513,7 @@ class Lesson:
         Validation rules:
         - VIDEO: requires content_url
         - PDF: requires content_url
+        - EMBED: requires content_url from allowed domains
         - TEXT: requires description
         - QUIZ: always valid (future implementation)
         """
@@ -494,10 +521,31 @@ class Lesson:
             return bool(self.content_url)
         if self.content_type == ContentType.PDF.value:
             return bool(self.content_url)
+        if self.content_type == ContentType.EMBED.value:
+            return bool(self.content_url) and self._is_allowed_embed_url()
         if self.content_type == ContentType.TEXT.value:
             return bool(self.description)
         # QUIZ and others: always valid for now
         return True
+
+    def _is_allowed_embed_url(self) -> bool:
+        """Check if embed URL is from an allowed domain."""
+        if not self.content_url:
+            return False
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(self.content_url)
+            domain = parsed.netloc.lower()
+            # Remove www. prefix if present
+            domain = domain.removeprefix("www.")
+            # Check if domain matches any allowed domain
+            return any(
+                domain == allowed or domain.endswith(f".{allowed}")
+                for allowed in ALLOWED_EMBED_DOMAINS
+            )
+        except Exception:
+            return False
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""

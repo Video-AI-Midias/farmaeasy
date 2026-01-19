@@ -152,12 +152,30 @@ class ModuleListResponse(BaseModel):
 # ==============================================================================
 
 
+def _is_allowed_embed_url(url: str) -> bool:
+    """Check if embed URL is from an allowed domain."""
+    from urllib.parse import urlparse
+
+    from src.courses.models import ALLOWED_EMBED_DOMAINS
+
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower().removeprefix("www.")
+        return any(
+            domain == allowed or domain.endswith(f".{allowed}")
+            for allowed in ALLOWED_EMBED_DOMAINS
+        )
+    except Exception:
+        return False
+
+
 class CreateLessonRequest(BaseModel):
     """Lesson creation request.
 
     Validation rules by content_type:
     - VIDEO: content_url is required
     - PDF: content_url is required
+    - EMBED: content_url is required and must be from allowed domains
     - TEXT: description is required (content_url optional)
     - QUIZ: no additional requirements (future implementation)
     """
@@ -167,7 +185,7 @@ class CreateLessonRequest(BaseModel):
         None, max_length=5000, description="Lesson description"
     )
     content_type: ContentType = Field(..., description="Type of content")
-    content_url: str | None = Field(None, max_length=1000, description="Content URL")
+    content_url: str | None = Field(None, max_length=2000, description="Content URL")
     duration_seconds: int | None = Field(None, ge=0, description="Duration in seconds")
 
     @model_validator(mode="after")
@@ -177,6 +195,14 @@ class CreateLessonRequest(BaseModel):
             raise ValueError("URL do vídeo é obrigatória para aulas do tipo VIDEO")
         if self.content_type == ContentType.PDF and not self.content_url:
             raise ValueError("URL do PDF é obrigatória para aulas do tipo PDF")
+        if self.content_type == ContentType.EMBED:
+            if not self.content_url:
+                raise ValueError("URL do embed é obrigatória para aulas do tipo EMBED")
+            if not _is_allowed_embed_url(self.content_url):
+                raise ValueError(
+                    "URL do embed deve ser de um domínio permitido "
+                    "(gamma.app, canva.com, docs.google.com, figma.com, etc.)"
+                )
         if self.content_type == ContentType.TEXT and not self.description:
             raise ValueError("Descrição/conteúdo é obrigatório para aulas do tipo TEXT")
         # QUIZ: no additional validation (future implementation)
@@ -197,7 +223,7 @@ class UpdateLessonRequest(BaseModel):
         None, max_length=5000, description="Lesson description"
     )
     content_type: ContentType | None = Field(None, description="Type of content")
-    content_url: str | None = Field(None, max_length=1000, description="Content URL")
+    content_url: str | None = Field(None, max_length=2000, description="Content URL")
     duration_seconds: int | None = Field(None, ge=0, description="Duration in seconds")
     status: ContentStatus | None = Field(None, description="Publication status")
 
