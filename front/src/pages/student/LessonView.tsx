@@ -759,28 +759,26 @@ function EmbedContent({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Iframe container - fills available space */}
-      <div className="flex-1 min-h-0 relative">
+    <div className="space-y-4">
+      {/* Iframe container with 16:9 aspect ratio for presentations */}
+      <div className="aspect-video w-full">
         <iframe
           src={lesson.content_url}
           title={lesson.title}
-          className="absolute inset-0 w-full h-full rounded-lg border-0"
+          className="w-full h-full rounded-lg border-0"
           allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
         />
       </div>
 
-      {/* Mark complete button - fixed at bottom */}
-      <div className="flex-shrink-0 pt-4 border-t mt-4">
-        <MarkCompleteButton
-          status={status}
-          isLoading={isUpdating}
-          onMarkComplete={onMarkComplete}
-          onMarkIncomplete={onMarkIncomplete}
-        />
-      </div>
+      {/* Mark complete button */}
+      <MarkCompleteButton
+        status={status}
+        isLoading={isUpdating}
+        onMarkComplete={onMarkComplete}
+        onMarkIncomplete={onMarkIncomplete}
+      />
     </div>
   );
 }
