@@ -152,21 +152,28 @@ class ModuleListResponse(BaseModel):
 # ==============================================================================
 
 
-def _is_allowed_embed_url(url: str) -> bool:
-    """Check if embed URL is from an allowed domain."""
+def _get_embed_domain(url: str) -> str | None:
+    """Extract domain from URL for error messages."""
     from urllib.parse import urlparse
-
-    from src.courses.models import ALLOWED_EMBED_DOMAINS
 
     try:
         parsed = urlparse(url)
-        domain = parsed.netloc.lower().removeprefix("www.")
-        return any(
-            domain == allowed or domain.endswith(f".{allowed}")
-            for allowed in ALLOWED_EMBED_DOMAINS
-        )
+        return parsed.netloc.lower().removeprefix("www.") or None
     except Exception:
+        return None
+
+
+def _is_allowed_embed_url(url: str) -> bool:
+    """Check if embed URL is from an allowed domain."""
+    from src.courses.models import ALLOWED_EMBED_DOMAINS
+
+    domain = _get_embed_domain(url)
+    if not domain:
         return False
+    return any(
+        domain == allowed or domain.endswith(f".{allowed}")
+        for allowed in ALLOWED_EMBED_DOMAINS
+    )
 
 
 class CreateLessonRequest(BaseModel):
@@ -199,8 +206,14 @@ class CreateLessonRequest(BaseModel):
             if not self.content_url:
                 raise ValueError("URL do embed é obrigatória para aulas do tipo EMBED")
             if not _is_allowed_embed_url(self.content_url):
+                domain = _get_embed_domain(self.content_url)
+                if domain:
+                    raise ValueError(
+                        f"Domínio '{domain}' não é permitido. "
+                        "Use: gamma.app, canva.com, docs.google.com, figma.com, miro.com, notion.so"
+                    )
                 raise ValueError(
-                    "URL do embed deve ser de um domínio permitido "
+                    "URL inválida. Informe uma URL de embed válida "
                     "(gamma.app, canva.com, docs.google.com, figma.com, etc.)"
                 )
         if self.content_type == ContentType.TEXT and not self.description:

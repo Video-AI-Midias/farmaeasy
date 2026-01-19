@@ -55,63 +55,63 @@ class CourseError(Exception):
 class CourseNotFoundError(CourseError):
     """Course not found."""
 
-    def __init__(self, message: str = "Curso nao encontrado"):
+    def __init__(self, message: str = "Curso não encontrado"):
         super().__init__(message, "course_not_found")
 
 
 class ModuleNotFoundError(CourseError):
     """Module not found."""
 
-    def __init__(self, message: str = "Modulo nao encontrado"):
+    def __init__(self, message: str = "Módulo não encontrado"):
         super().__init__(message, "module_not_found")
 
 
 class LessonNotFoundError(CourseError):
     """Lesson not found."""
 
-    def __init__(self, message: str = "Aula nao encontrada"):
+    def __init__(self, message: str = "Aula não encontrada"):
         super().__init__(message, "lesson_not_found")
 
 
 class SlugExistsError(CourseError):
     """Slug already exists."""
 
-    def __init__(self, message: str = "Slug ja existe"):
+    def __init__(self, message: str = "Slug já existe"):
         super().__init__(message, "slug_exists")
 
 
 class ModuleInUseError(CourseError):
     """Module is in use by courses."""
 
-    def __init__(self, message: str = "Modulo esta em uso"):
+    def __init__(self, message: str = "Módulo está em uso por cursos"):
         super().__init__(message, "module_in_use")
 
 
 class LessonInUseError(CourseError):
     """Lesson is in use by modules."""
 
-    def __init__(self, message: str = "Aula esta em uso"):
+    def __init__(self, message: str = "Aula está em uso por módulos"):
         super().__init__(message, "lesson_in_use")
 
 
 class AlreadyLinkedError(CourseError):
     """Item already linked."""
 
-    def __init__(self, message: str = "Item ja vinculado"):
+    def __init__(self, message: str = "Item já está vinculado"):
         super().__init__(message, "already_linked")
 
 
 class NotLinkedError(CourseError):
     """Item not linked."""
 
-    def __init__(self, message: str = "Item nao vinculado"):
+    def __init__(self, message: str = "Item não está vinculado"):
         super().__init__(message, "not_linked")
 
 
 class InvalidContentError(CourseError):
     """Content is invalid for the content type."""
 
-    def __init__(self, message: str = "Conteudo invalido para o tipo de aula"):
+    def __init__(self, message: str = "Conteúdo inválido para o tipo de aula"):
         super().__init__(message, "invalid_content")
 
 
@@ -242,17 +242,23 @@ class LessonService:
                 content_type = ContentType(lesson.content_type)
                 if content_type == ContentType.VIDEO:
                     raise InvalidContentError(
-                        "Nao e possivel publicar: URL do video e obrigatoria"
+                        "Não é possível publicar: URL do vídeo é obrigatória"
                     )
                 if content_type == ContentType.PDF:
                     raise InvalidContentError(
-                        "Nao e possivel publicar: URL do PDF e obrigatoria"
+                        "Não é possível publicar: URL do PDF é obrigatória"
                     )
                 if content_type == ContentType.TEXT:
                     raise InvalidContentError(
-                        "Nao e possivel publicar: Descricao/conteudo e obrigatorio"
+                        "Não é possível publicar: Descrição/conteúdo é obrigatório"
                     )
-                raise InvalidContentError
+                if content_type == ContentType.EMBED:
+                    raise InvalidContentError(
+                        "Não é possível publicar: URL do embed é obrigatória"
+                    )
+                raise InvalidContentError(
+                    "Não é possível publicar: conteúdo incompleto"
+                )
             lesson.status = data.status.value
 
         lesson.updated_at = datetime.now(UTC)
@@ -297,7 +303,7 @@ class LessonService:
         usages = list(rows)
 
         if usages and not force:
-            raise LessonInUseError(f"Aula usada em {len(usages)} modulo(s)")
+            raise LessonInUseError(f"Aula está em uso por {len(usages)} módulo(s)")
 
         # Force delete: unlink from all modules first
         unlinked_count = 0
@@ -649,7 +655,7 @@ class ModuleService:
             self._get_lesson_in_module, [module_id, lesson_id]
         )
         if rows:
-            raise AlreadyLinkedError("Aula ja vinculada a este modulo")
+            raise AlreadyLinkedError("Aula já está vinculada a este módulo")
 
         # Auto-calculate position if not provided
         if position is None:
@@ -689,7 +695,7 @@ class ModuleService:
         )
         row = rows[0] if rows else None
         if not row:
-            raise NotLinkedError("Aula nao vinculada a este modulo")
+            raise NotLinkedError("Aula não está vinculada a este módulo")
 
         position = row.position
 
@@ -734,7 +740,7 @@ class ModuleService:
 
         # Verify all IDs exist in current lessons
         if set(lesson_ids) != current_ids:
-            msg = "Lista de IDs nao corresponde aos modulos atuais"
+            msg = "Lista de IDs não corresponde aos itens atuais"
             raise CourseError(msg, "invalid_reorder")
 
         # Delete all current links
@@ -1162,7 +1168,7 @@ class CourseService:
         )
         row = rows[0] if rows else None
         if not row:
-            raise NotLinkedError("Modulo nao vinculado a este curso")
+            raise NotLinkedError("Módulo não está vinculado a este curso")
 
         position = row.position
 
@@ -1207,7 +1213,7 @@ class CourseService:
 
         # Verify all IDs exist in current modules
         if set(module_ids) != current_ids:
-            msg = "Lista de IDs nao corresponde aos modulos atuais"
+            msg = "Lista de IDs não corresponde aos itens atuais"
             raise CourseError(msg, "invalid_reorder")
 
         # Delete all current links

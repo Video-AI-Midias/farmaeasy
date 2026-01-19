@@ -364,6 +364,18 @@ def create_app() -> FastAPI:
             method=request.method,
         )
 
+        # Map status codes to error codes for client-side handling
+        status_code_map = {
+            400: "bad_request",
+            401: "unauthorized",
+            403: "forbidden",
+            404: "not_found",
+            409: "conflict",
+            422: "unprocessable_entity",
+            429: "rate_limited",
+            500: "internal_error",
+        }
+
         # Return safe error message to user
         return ORJSONResponse(
             status_code=exc.status_code,
@@ -371,7 +383,8 @@ def create_app() -> FastAPI:
                 "error": True,
                 "message": str(exc.detail)
                 if exc.status_code < status.HTTP_500_INTERNAL_SERVER_ERROR
-                else "Internal server error",
+                else "Erro interno do servidor",
+                "code": status_code_map.get(exc.status_code, "http_error"),
                 "status_code": exc.status_code,
                 "request_id": request_id,
             },
@@ -392,18 +405,35 @@ def create_app() -> FastAPI:
             method=request.method,
         )
 
+        def _get_error_code(err: dict) -> str:
+            """Generate error code from validation error type."""
+            err_type = err.get("type", "value_error")
+            field = ".".join(str(loc) for loc in err.get("loc", []))
+            # Common validation types to friendly codes
+            type_map = {
+                "missing": "required",
+                "string_too_short": "min_length",
+                "string_too_long": "max_length",
+                "value_error": "invalid_value",
+                "type_error": "invalid_type",
+            }
+            code = type_map.get(err_type, err_type.replace(".", "_"))
+            return f"{field}_{code}" if field else code
+
         # Return user-friendly validation errors (these are safe to expose)
         return ORJSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "error": True,
-                "message": "Validation error",
+                "message": "Erro de validação",
+                "code": "validation_error",
                 "status_code": 422,
                 "request_id": request_id,
                 "details": [
                     {
                         "field": ".".join(str(loc) for loc in err.get("loc", [])),
-                        "message": err.get("msg", "Invalid value"),
+                        "code": _get_error_code(err),
+                        "message": err.get("msg", "Valor inválido"),
                     }
                     for err in exc.errors()
                 ],
