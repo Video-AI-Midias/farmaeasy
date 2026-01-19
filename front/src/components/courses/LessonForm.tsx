@@ -56,6 +56,22 @@ const BUNNY_URL_PATTERNS = [
 ];
 
 /**
+ * Extracts URL from iframe HTML code if present.
+ * Returns the original value if no iframe is detected.
+ */
+function extractUrlFromIframe(value: string): string {
+  if (!value) return value;
+
+  // Check if it looks like iframe HTML (contains src= or iframe tag)
+  const srcMatch = value.match(/src=["']([^"']+)["']/i);
+  if (srcMatch?.[1]) {
+    return srcMatch[1];
+  }
+
+  return value;
+}
+
+/**
  * Validates video content URL.
  * Accepts:
  * - Bunny.net video ID (UUID format)
@@ -86,6 +102,19 @@ function isValidVideoContent(value: string): boolean {
   }
 }
 
+/**
+ * Validates any URL (for PDF and generic content).
+ */
+function isValidUrl(value: string): boolean {
+  if (!value) return true;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const lessonSchema = z
   .object({
     title: z
@@ -101,10 +130,6 @@ const lessonSchema = z
     content_url: z
       .string()
       .max(2000, "URL deve ter no maximo 2000 caracteres")
-      .refine(isValidVideoContent, {
-        message:
-          "Informe uma URL valida ou um ID de video Bunny.net (ex: 5f41bf1c-bc67-4155-b700-2aeb489dbeea)",
-      })
       .optional()
       .nullable()
       .or(z.literal("")),
@@ -117,23 +142,42 @@ const lessonSchema = z
     status: z.nativeEnum(ContentStatus).optional(),
   })
   .superRefine((data, ctx) => {
-    // VIDEO requires content_url
-    if (data.content_type === ContentType.VIDEO && !data.content_url) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "URL do video e obrigatoria para aulas do tipo Video",
-        path: ["content_url"],
-      });
+    // VIDEO: requires content_url and validates Bunny.net format
+    if (data.content_type === ContentType.VIDEO) {
+      if (!data.content_url) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "URL do video e obrigatoria para aulas do tipo Video",
+          path: ["content_url"],
+        });
+      } else if (!isValidVideoContent(data.content_url)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Informe uma URL valida ou um ID de video Bunny.net (ex: 5f41bf1c-bc67-4155-b700-2aeb489dbeea)",
+          path: ["content_url"],
+        });
+      }
     }
-    // PDF requires content_url
-    if (data.content_type === ContentType.PDF && !data.content_url) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "URL do PDF e obrigatoria para aulas do tipo PDF",
-        path: ["content_url"],
-      });
+
+    // PDF: requires content_url and validates URL format
+    if (data.content_type === ContentType.PDF) {
+      if (!data.content_url) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "URL do PDF e obrigatoria para aulas do tipo PDF",
+          path: ["content_url"],
+        });
+      } else if (!isValidUrl(data.content_url)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Informe uma URL valida para o PDF",
+          path: ["content_url"],
+        });
+      }
     }
-    // TEXT requires description
+
+    // TEXT: requires description
     if (data.content_type === ContentType.TEXT && !data.description) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -141,7 +185,8 @@ const lessonSchema = z
         path: ["description"],
       });
     }
-    // EMBED requires content_url and must be from allowed domains
+
+    // EMBED: requires content_url from allowed domains
     if (data.content_type === ContentType.EMBED) {
       if (!data.content_url) {
         ctx.addIssue({
@@ -149,13 +194,17 @@ const lessonSchema = z
           message: "URL do embed e obrigatoria para aulas do tipo Apresentacao",
           path: ["content_url"],
         });
-      } else if (!isAllowedEmbedUrl(data.content_url)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "URL do embed deve ser de um dominio permitido (gamma.app, canva.com, docs.google.com, figma.com, etc.)",
-          path: ["content_url"],
-        });
+      } else {
+        // Try to extract URL from iframe HTML if user pasted the full code
+        const extractedUrl = extractUrlFromIframe(data.content_url);
+        if (!isAllowedEmbedUrl(extractedUrl)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Informe apenas a URL do embed (ex: https://gamma.app/embed/xyz). Dominios permitidos: gamma.app, canva.com, docs.google.com, figma.com, etc.",
+            path: ["content_url"],
+          });
+        }
       }
     }
   });
