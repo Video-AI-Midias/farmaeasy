@@ -15,8 +15,8 @@ services:
   # ============================================================================
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
       target: development
     container_name: farmaeasy-api-dev
     restart: unless-stopped
