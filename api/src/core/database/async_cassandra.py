@@ -265,6 +265,16 @@ async def init_async_registration_links_tables(session, keyspace: str) -> None:
     logger.info("async_registration_links_tables_created", keyspace=keyspace)
 
 
+async def init_async_attachments_tables(session, keyspace: str) -> None:
+    """Create attachments tables (async)."""
+    from src.attachments.models import ATTACHMENTS_TABLES_CQL
+
+    for cql_template in ATTACHMENTS_TABLES_CQL:
+        cql = cql_template.format(keyspace=keyspace)
+        await session.aexecute(cql)
+    logger.info("async_attachments_tables_created", keyspace=keyspace)
+
+
 async def init_async_cassandra():
     """Initialize async Cassandra connection and schema.
 
@@ -292,6 +302,7 @@ async def init_async_cassandra():
     await init_async_notifications_tables(session, settings.cassandra_keyspace)
     await init_async_acquisitions_tables(session, settings.cassandra_keyspace)
     await init_async_registration_links_tables(session, settings.cassandra_keyspace)
+    await init_async_attachments_tables(session, settings.cassandra_keyspace)
 
     logger.info(
         "async_cassandra_initialized",

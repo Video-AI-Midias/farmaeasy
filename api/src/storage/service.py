@@ -144,6 +144,7 @@ class FirebaseStorageService:
 
     # Extension mapping for content types
     EXTENSION_MAP: dict[str, str] = {
+        # Images
         "image/jpeg": ".jpg",
         "image/png": ".png",
         "image/webp": ".webp",
@@ -153,6 +154,38 @@ class FirebaseStorageService:
         "image/avif": ".avif",
         "image/heic": ".heic",
         "image/svg+xml": ".svg",
+        # Documents
+        "application/pdf": ".pdf",
+        "application/msword": ".doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+        "application/vnd.oasis.opendocument.text": ".odt",
+        "text/plain": ".txt",
+        "text/markdown": ".md",
+        "application/rtf": ".rtf",
+        # Spreadsheets
+        "application/vnd.ms-excel": ".xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        "application/vnd.oasis.opendocument.spreadsheet": ".ods",
+        "text/csv": ".csv",
+        # Presentations
+        "application/vnd.ms-powerpoint": ".ppt",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+        "application/vnd.oasis.opendocument.presentation": ".odp",
+        # Archives
+        "application/zip": ".zip",
+        "application/x-rar-compressed": ".rar",
+        "application/x-7z-compressed": ".7z",
+        "application/gzip": ".gz",
+        # Audio
+        "audio/mpeg": ".mp3",
+        "audio/wav": ".wav",
+        "audio/ogg": ".ogg",
+        "audio/webm": ".weba",
+        # Video
+        "video/mp4": ".mp4",
+        "video/webm": ".webm",
+        "video/quicktime": ".mov",
+        "video/x-msvideo": ".avi",
     }
 
     def __init__(self, settings: Settings) -> None:
@@ -176,8 +209,18 @@ class FirebaseStorageService:
 
     @property
     def allowed_types(self) -> list[str]:
-        """Allowed MIME types."""
+        """Allowed MIME types for thumbnails."""
         return self.settings.upload_allowed_image_types
+
+    @property
+    def attachment_max_file_size(self) -> int:
+        """Maximum file size for attachments in bytes."""
+        return self.settings.attachment_max_file_size_mb * 1024 * 1024
+
+    @property
+    def attachment_allowed_types(self) -> list[str]:
+        """Allowed MIME types for attachments."""
+        return self.settings.attachment_allowed_types
 
     def _ensure_configured(self) -> None:
         """Ensure Firebase is configured.
@@ -378,3 +421,125 @@ class FirebaseStorageService:
         except Exception as e:
             logger.exception("delete_failed", storage_path=storage_path, error=str(e))
             raise StorageUploadError(f"Failed to delete file: {e}") from e
+
+    def _build_attachment_storage_path(
+        self,
+        attachment_id: str,
+        entity_type: str,
+        content_type: str,
+        original_filename: str | None = None,
+    ) -> str:
+        """Build storage path for an attachment.
+
+        Uses UUID for uniqueness, preserves extension for proper content handling.
+        Format: farmaeasy/attachments/{entity_type}/{uuid}{ext}
+
+        Args:
+            attachment_id: UUID of the attachment.
+            entity_type: Type of entity (course, module, lesson).
+            content_type: MIME type of the file.
+            original_filename: Original filename (for extension fallback).
+
+        Returns:
+            Storage path string.
+        """
+        # Determine extension
+        ext = self.EXTENSION_MAP.get(content_type, "")
+        if not ext and original_filename:
+            ext = Path(original_filename).suffix.lower()
+
+        filename = f"{attachment_id}{ext}"
+        return f"farmaeasy/attachments/{entity_type}/{filename}"
+
+    async def upload_attachment(
+        self,
+        content: bytes,
+        content_type: str,
+        attachment_id: str,
+        entity_type: str,
+        original_filename: str,
+    ) -> dict[str, str | int | datetime]:
+        """Upload an attachment file to Firebase Storage.
+
+        Uses UUID as filename for uniqueness, preserves original_filename
+        for download purposes.
+
+        Args:
+            content: File content as bytes.
+            content_type: Declared Content-Type.
+            attachment_id: UUID for the attachment (used as filename).
+            entity_type: Type of entity (lesson, module, course).
+            original_filename: Original name of the file (preserved for downloads).
+
+        Returns:
+            Dict with file_url, storage_path, content_type, file_size,
+            original_filename, uploaded_at.
+
+        Raises:
+            StorageNotConfiguredError: If Firebase is not configured.
+            FileTooLargeError: If file exceeds size limit.
+            InvalidContentTypeError: If content type is not allowed.
+            StorageUploadError: If upload fails.
+        """
+        self._ensure_configured()
+
+        # Validate file size
+        file_size = len(content)
+        if file_size > self.attachment_max_file_size:
+            raise FileTooLargeError(file_size, self.attachment_max_file_size)
+
+        # Validate content type
+        if content_type not in self.attachment_allowed_types:
+            raise InvalidContentTypeError(content_type, self.attachment_allowed_types)
+
+        # Build storage path using UUID
+        storage_path = self._build_attachment_storage_path(
+            attachment_id=attachment_id,
+            entity_type=entity_type,
+            content_type=content_type,
+            original_filename=original_filename,
+        )
+
+        try:
+            bucket = self._get_bucket()
+            blob: Blob = bucket.blob(storage_path)
+
+            # Set cache control - attachments can be cached but should validate
+            blob.cache_control = "public, max-age=86400"  # 1 day
+
+            # Set content disposition to preserve original filename on download
+            safe_filename = quote(original_filename, safe="")
+            blob.content_disposition = f"attachment; filename*=UTF-8''{safe_filename}"
+
+            # Upload content
+            blob.upload_from_string(content, content_type=content_type)
+
+            # Make publicly accessible
+            blob.make_public()
+
+            logger.info(
+                "attachment_uploaded",
+                storage_path=storage_path,
+                content_type=content_type,
+                file_size=file_size,
+                entity_type=entity_type,
+                attachment_id=attachment_id,
+                original_filename=original_filename,
+            )
+
+            return {
+                "file_url": self._generate_public_url(storage_path),
+                "storage_path": storage_path,
+                "content_type": content_type,
+                "file_size": file_size,
+                "original_filename": original_filename,
+                "uploaded_at": datetime.now(UTC),
+            }
+
+        except Exception as e:
+            logger.exception(
+                "attachment_upload_failed",
+                storage_path=storage_path,
+                error=str(e),
+            )
+            raise StorageUploadError(f"Failed to upload attachment: {e}") from e

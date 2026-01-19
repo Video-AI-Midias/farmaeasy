@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.acquisitions.router import admin_router as acquisitions_admin_router
 from src.acquisitions.router import router as acquisitions_router
+from src.attachments.router import router as attachments_router
 from src.auth.router import router as auth_router
 from src.auth.service import AuthService
 from src.auth.verification import VerificationService
@@ -67,6 +68,7 @@ class AppState:
     email_service: EmailService | None = None
     verification_service: VerificationService | None = None
     registration_link_service: RegistrationLinkService | None = None
+    attachments_service: Any = None  # AttachmentsService (lazy import)
 
 
 app_state = AppState()
@@ -134,6 +136,14 @@ def get_registration_link_service() -> RegistrationLinkService:
         msg = "RegistrationLinkService not initialized"
         raise RuntimeError(msg)
     return app_state.registration_link_service
+
+
+def get_attachments_service():
+    """Get AttachmentsService instance from app state."""
+    if app_state.attachments_service is None:
+        msg = "AttachmentsService not initialized"
+        raise RuntimeError(msg)
+    return app_state.attachments_service
 
 
 @asynccontextmanager
@@ -234,6 +244,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         app.state.registration_link_service = app_state.registration_link_service
         logger.info("registration_link_service_initialized")
+
+        # Initialize Attachments Service
+        from src.attachments.service import AttachmentsService
+        from src.storage.service import FirebaseStorageService
+
+        storage_service = FirebaseStorageService(settings)
+        app_state.attachments_service = AttachmentsService(
+            session=app_state.cassandra_session,
+            keyspace=settings.cassandra_keyspace,
+            storage_service=storage_service,
+        )
+        app.state.attachments_service = app_state.attachments_service
+        logger.info("attachments_service_initialized")
     except Exception as e:
         logger.warning(
             "database_init_skipped",
@@ -433,6 +456,7 @@ def create_app() -> FastAPI:
     app.include_router(enrollments_router)
     app.include_router(video_router)
     app.include_router(storage_router)
+    app.include_router(attachments_router)
     app.include_router(acquisitions_router)
     app.include_router(acquisitions_admin_router)
     app.include_router(email_router)
@@ -485,6 +509,12 @@ set_lesson_service_getter(get_lesson_service)
 set_notification_service_getter(get_notification_service)
 set_acquisitions_auth_service_getter(get_auth_service)
 set_registration_link_service_getter(get_registration_link_service)
+
+# Configure attachments service dependency
+from src.attachments.dependencies import set_attachments_service_getter  # noqa: E402
+
+
+set_attachments_service_getter(get_attachments_service)
 
 
 app = create_app()

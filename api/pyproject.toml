@@ -146,7 +146,7 @@ ignore = [
 # Circular import prevention - imports inside functions are intentional
 "src/core/middleware.py" = ["PLC0415", "PLR2004"]
 "src/core/logging.py" = ["ARG001", "PLC0415"]  # structlog processor signature requires these args
-"src/main.py" = ["PLC0415", "ARG001", "ERA001", "PERF401"]  # exception handlers require request arg
+"src/main.py" = ["PLC0415", "ARG001", "ERA001", "PERF401", "PLR0915"]  # exception handlers require request arg, lifespan has many stmts
 "src/health/router.py" = ["PLC0415"]
 "src/core/database/cassandra.py" = ["ERA001"]  # Informational comments are not commented-out code
 # Settings defaults with hardcoded values are expected
@@ -173,6 +173,13 @@ ignore = [
 # Email module - lazy imports for circular dependency prevention, template variable names contain "PASSWORD"
 "src/email/service.py" = ["PLC0415"]  # Intentional lazy imports to avoid circular dependencies
 "src/email/templates.py" = ["S105"]  # Variable names contain "PASSWORD" but are just email template strings
+# Attachments module - CQL statements, FastAPI Form/File defaults, lazy imports
+"src/attachments/models.py" = ["S608"]  # CQL table creation strings
+"src/attachments/service.py" = ["S608"]  # CQL prepared statements
+"src/attachments/router.py" = ["PLC0415", "ARG001"]  # Lazy imports, user param for auth validation
+"src/attachments/dependencies.py" = ["PLW0603"]  # Global service getter pattern (same as courses)
+"src/attachments/schemas.py" = ["PLR2004"]  # Magic value for file size formatting
+"src/core/database/async_cassandra.py" = ["PLC0415"]  # Lazy imports to avoid circular dependencies
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -184,7 +191,7 @@ inline-quotes = "double"
 docstring-quotes = "double"
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.File", "fastapi.Form"]
 
 [tool.ruff.format]
 quote-style = "double"

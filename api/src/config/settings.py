@@ -195,6 +195,51 @@ class Settings(BaseSettings):
         default=30, description="Maximum uploads per minute per user"
     )
 
+    # Attachment Upload Settings (for course materials)
+    attachment_max_file_size_mb: int = Field(
+        default=50, description="Maximum file size for attachment uploads in MB"
+    )
+    attachment_allowed_types: list[str] = Field(
+        default=[
+            # Documents
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.oasis.opendocument.text",
+            "text/plain",
+            "text/markdown",
+            "application/rtf",
+            # Spreadsheets
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.oasis.opendocument.spreadsheet",
+            "text/csv",
+            # Presentations
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.oasis.opendocument.presentation",
+            # Images
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/svg+xml",
+            # Archives
+            "application/zip",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/gzip",
+            # Audio
+            "audio/mpeg",
+            "audio/wav",
+            "audio/ogg",
+            # Video (small files only)
+            "video/mp4",
+            "video/webm",
+        ],
+        description="Allowed MIME types for course attachments",
+    )
+
     # Registration Links
     master_api_key: str | None = Field(
         default=None,
