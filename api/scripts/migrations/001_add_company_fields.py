@@ -19,12 +19,13 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 import structlog
 from cassandra.auth import PlainTextAuthProvider
 from cassandra_asyncio.cluster import Cluster
+
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.config.settings import get_settings
 
@@ -73,13 +74,15 @@ async def migrate_up(session, keyspace: str) -> tuple[int, int]:
                 logger.info("migration_skipped_exists", statement=stmt[:60] + "...")
                 skipped += 1
             else:
-                logger.error("migration_failed", statement=stmt[:60] + "...", error=str(e))
+                logger.error(
+                    "migration_failed", statement=stmt[:60] + "...", error=str(e)
+                )
                 raise
 
     return applied, skipped
 
 
-async def migrate_down(session, keyspace: str) -> None:
+async def migrate_down(_session, _keyspace: str) -> None:
     """Rollback migration.
 
     Note: Cassandra doesn't support DROP COLUMN in older versions.
