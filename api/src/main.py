@@ -38,6 +38,9 @@ from src.notifications.websocket_router import router as notifications_ws_router
 from src.progress.router import enrollments_router
 from src.progress.router import router as progress_router
 from src.progress.service import ProgressService
+from src.registration_links.router import public_router as registration_public_router
+from src.registration_links.router import router as registration_links_router
+from src.registration_links.service import RegistrationLinkService
 from src.storage.router import router as storage_router
 from src.video.router import router as video_router
 
@@ -63,6 +66,7 @@ class AppState:
     notification_service: NotificationService | None = None
     email_service: EmailService | None = None
     verification_service: VerificationService | None = None
+    registration_link_service: RegistrationLinkService | None = None
 
 
 app_state = AppState()
@@ -122,6 +126,14 @@ def get_verification_service() -> VerificationService:
         msg = "VerificationService not initialized"
         raise RuntimeError(msg)
     return app_state.verification_service
+
+
+def get_registration_link_service() -> RegistrationLinkService:
+    """Get RegistrationLinkService instance from app state."""
+    if app_state.registration_link_service is None:
+        msg = "RegistrationLinkService not initialized"
+        raise RuntimeError(msg)
+    return app_state.registration_link_service
 
 
 @asynccontextmanager
@@ -202,6 +214,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         app.state.progress_service = app_state.progress_service
         logger.info("progress_service_initialized")
+
+        # Initialize Registration Link Service
+        # Import acquisition service if needed
+        from src.acquisitions.service import AcquisitionService
+
+        acquisition_service = AcquisitionService(
+            session=app_state.cassandra_session,
+            keyspace=settings.cassandra_keyspace,
+            redis=redis_client,
+        )
+
+        app_state.registration_link_service = RegistrationLinkService(
+            session=app_state.cassandra_session,
+            keyspace=settings.cassandra_keyspace,
+            redis=redis_client,
+            auth_service=app_state.auth_service,
+            acquisition_service=acquisition_service,
+        )
+        app.state.registration_link_service = app_state.registration_link_service
+        logger.info("registration_link_service_initialized")
     except Exception as e:
         logger.warning(
             "database_init_skipped",
@@ -405,6 +437,8 @@ def create_app() -> FastAPI:
     app.include_router(acquisitions_admin_router)
     app.include_router(email_router)
     app.include_router(email_admin_router)
+    app.include_router(registration_links_router)
+    app.include_router(registration_public_router)
 
     @app.get("/", include_in_schema=False)
     async def root(request: Request) -> dict[str, str]:
@@ -437,6 +471,9 @@ from src.notifications.admin_router import (  # noqa: E402
 from src.notifications.dependencies import (  # noqa: E402
     set_notification_service_getter,
 )
+from src.registration_links.dependencies import (  # noqa: E402
+    set_service_getter as set_registration_link_service_getter,
+)
 
 
 set_auth_service_getter(get_auth_service)
@@ -447,6 +484,7 @@ set_module_service_getter(get_module_service)
 set_lesson_service_getter(get_lesson_service)
 set_notification_service_getter(get_notification_service)
 set_acquisitions_auth_service_getter(get_auth_service)
+set_registration_link_service_getter(get_registration_link_service)
 
 
 app = create_app()
