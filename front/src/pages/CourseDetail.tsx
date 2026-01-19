@@ -9,6 +9,7 @@
  */
 
 import { CourseStudentsPanel } from "@/components/acquisitions";
+import { AttachmentsSection } from "@/components/attachments";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import {
   CourseEditor,
@@ -27,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, renderTextWithLinks } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
+import { EntityType } from "@/types/attachments";
 import {
   ContentStatus,
   type CreateLessonRequest,
@@ -44,6 +46,7 @@ import {
   Calendar,
   Edit,
   ExternalLink,
+  FileText,
   Layers,
   Loader2,
   Users,
@@ -292,6 +295,10 @@ function CourseDetailContent() {
               <BookOpen className="mr-2 h-4 w-4" />
               Informacoes
             </TabsTrigger>
+            <TabsTrigger value="materials">
+              <FileText className="mr-2 h-4 w-4" />
+              Materiais
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="structure" className="space-y-4">
@@ -397,6 +404,14 @@ function CourseDetailContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="materials">
+            <AttachmentsSection
+              entityType={EntityType.COURSE}
+              entityId={currentCourse.id}
+              title="Materiais do Curso"
+            />
           </TabsContent>
         </Tabs>
 

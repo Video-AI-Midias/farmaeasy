@@ -1,10 +1,4 @@
-/**
- * Lesson form component for creating and editing lessons.
- *
- * Uses React Hook Form with Zod validation.
- * Features thumbnail preview for video content.
- */
-
+import { AttachmentsSection } from "@/components/attachments";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VideoSelectorModal } from "@/components/video/VideoSelectorModal";
 import { VideoThumbnail } from "@/components/video/VideoThumbnail";
 import type { VideoItem } from "@/lib/video-api";
+import { EntityType } from "@/types/attachments";
 import {
   ContentStatus,
   ContentType,
@@ -241,7 +236,9 @@ export function LessonForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className={isEditing ? "sm:max-w-[600px] max-h-[90vh] overflow-y-auto" : "sm:max-w-[500px]"}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Aula" : "Criar Aula"}</DialogTitle>
           <DialogDescription>
@@ -430,6 +427,18 @@ export function LessonForm({
                   </FormItem>
                 )}
               />
+            )}
+
+            {/* Attachments section (only when editing) */}
+            {isEditing && lesson && (
+              <div className="pt-4 border-t">
+                <AttachmentsSection
+                  entityType={EntityType.LESSON}
+                  entityId={lesson.id}
+                  title="Materiais da Aula"
+                  className="border-0 shadow-none"
+                />
+              </div>
             )}
 
             <DialogFooter>

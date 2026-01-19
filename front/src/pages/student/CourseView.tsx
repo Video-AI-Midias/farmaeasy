@@ -1,15 +1,4 @@
-/**
- * Student course overview page.
- *
- * Features:
- * - Course header with title, description, and thumbnail
- * - Expandable module list
- * - Lesson list with content type icons
- * - Real progress tracking from backend
- * - Resume from last position
- * - Navigation to lesson view
- */
-
+import { CourseMaterials } from "@/components/attachments";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout";
 import { LessonProgressIndicator } from "@/components/progress";
@@ -463,6 +452,12 @@ export function StudentCourseViewContent() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Materials Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Materiais de Apoio</h2>
+          <CourseMaterials courseId={currentCourse.id} />
         </div>
       </div>
     </AppLayout>

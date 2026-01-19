@@ -8,6 +8,7 @@
  * - Create new lessons directly
  */
 
+import { AttachmentsSection } from "@/components/attachments";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { LessonCard, LessonForm, LessonSelector, ModuleForm } from "@/components/courses";
 import { AppLayout } from "@/components/layout";
@@ -19,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useCoursesStore } from "@/stores/courses";
+import { EntityType } from "@/types/attachments";
 import {
   ContentStatus,
   type CreateLessonRequest,
@@ -49,6 +51,7 @@ import {
   BookOpen,
   Calendar,
   Edit,
+  FileText,
   GripVertical,
   Layers,
   Loader2,
@@ -336,6 +339,10 @@ function ModuleDetailContent() {
               <Layers className="mr-2 h-4 w-4" />
               Aulas ({localLessons.length})
             </TabsTrigger>
+            <TabsTrigger value="materials">
+              <FileText className="mr-2 h-4 w-4" />
+              Materiais
+            </TabsTrigger>
             <TabsTrigger value="info">
               <BookOpen className="mr-2 h-4 w-4" />
               Informacoes
@@ -410,6 +417,14 @@ function ModuleDetailContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="materials">
+            <AttachmentsSection
+              entityType={EntityType.MODULE}
+              entityId={currentModule.id}
+              title="Materiais do Modulo"
+            />
           </TabsContent>
 
           <TabsContent value="info">
