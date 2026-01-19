@@ -283,11 +283,17 @@ export function LessonForm({
   }, [lesson, form]);
 
   const handleSubmit = async (data: LessonFormData) => {
+    // For EMBED type, extract URL from iframe if user pasted full HTML code
+    let contentUrl = data.content_url || null;
+    if (data.content_type === ContentType.EMBED && contentUrl) {
+      contentUrl = extractUrlFromIframe(contentUrl);
+    }
+
     const submitData = {
       title: data.title,
       description: data.description || null,
       content_type: data.content_type,
-      content_url: data.content_url || null,
+      content_url: contentUrl,
       duration_seconds: data.duration_seconds ?? null,
       ...(isEditing && { status: data.status }),
     };
