@@ -65,7 +65,9 @@ import {
   HelpCircle,
   Layers,
   Loader2,
+  Maximize2,
   Menu,
+  Minimize2,
   Play,
   PlayCircle,
   RefreshCw,
@@ -747,6 +749,36 @@ function EmbedContent({
   status: LessonProgressStatus;
   isUpdating: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Handle fullscreen change events (including Esc key exit)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+      toast.error("Não foi possível alternar para tela cheia");
+    }
+  }, []);
+
   if (!lesson.content_url) {
     return (
       <Card>
@@ -761,15 +793,32 @@ function EmbedContent({
   return (
     <div className="space-y-4">
       {/* Iframe container with 16:9 aspect ratio for presentations */}
-      <div className="aspect-video w-full">
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative w-full bg-black rounded-lg overflow-hidden",
+          isFullscreen ? "h-screen" : "aspect-video",
+        )}
+      >
         <iframe
           src={lesson.content_url}
           title={lesson.title}
-          className="w-full h-full rounded-lg border-0"
+          className="w-full h-full border-0"
           allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
         />
+
+        {/* Fullscreen toggle button */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white border-0"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+        >
+          {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+        </Button>
       </div>
 
       {/* Mark complete button */}
