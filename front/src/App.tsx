@@ -14,6 +14,8 @@ import { LoginPage } from "@/pages/Login";
 import { ModuleDetailPage } from "@/pages/ModuleDetail";
 import { ModulesPage } from "@/pages/Modules";
 import { RegisterPage } from "@/pages/Register";
+import { RegisterByLinkPage } from "@/pages/RegisterByLinkPage";
+import { RegistrationLinksPage } from "@/pages/RegistrationLinksPage";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
 import { SettingsPage } from "@/pages/Settings";
 import { UnauthorizedPage } from "@/pages/Unauthorized";
@@ -68,6 +70,7 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/cadastrar/:shortcode" element={<RegisterByLinkPage />} />
       <Route
         path="/esqueci-senha"
         element={
@@ -148,6 +151,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="admin">
             <AdminNotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/painel/links-cadastro"
+        element={
+          <ProtectedRoute requiredRole="teacher">
+            <RegistrationLinksPage />
           </ProtectedRoute>
         }
       />
