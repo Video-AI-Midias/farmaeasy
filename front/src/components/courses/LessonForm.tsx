@@ -36,6 +36,7 @@ import {
   type CreateLessonRequest,
   type Lesson,
   type UpdateLessonRequest,
+  isAllowedEmbedUrl,
 } from "@/types/courses";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Video } from "lucide-react";
@@ -99,7 +100,7 @@ const lessonSchema = z
     content_type: z.nativeEnum(ContentType),
     content_url: z
       .string()
-      .max(1000, "URL deve ter no maximo 1000 caracteres")
+      .max(2000, "URL deve ter no maximo 2000 caracteres")
       .refine(isValidVideoContent, {
         message:
           "Informe uma URL valida ou um ID de video Bunny.net (ex: 5f41bf1c-bc67-4155-b700-2aeb489dbeea)",
@@ -139,6 +140,23 @@ const lessonSchema = z
         message: "Descricao/conteudo e obrigatorio para aulas do tipo Texto",
         path: ["description"],
       });
+    }
+    // EMBED requires content_url and must be from allowed domains
+    if (data.content_type === ContentType.EMBED) {
+      if (!data.content_url) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "URL do embed e obrigatoria para aulas do tipo Apresentacao",
+          path: ["content_url"],
+        });
+      } else if (!isAllowedEmbedUrl(data.content_url)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "URL do embed deve ser de um dominio permitido (gamma.app, canva.com, docs.google.com, figma.com, etc.)",
+          path: ["content_url"],
+        });
+      }
     }
   });
 
@@ -187,7 +205,10 @@ export function LessonForm({
   const contentType = form.watch("content_type");
 
   // Determine which fields are required based on content_type
-  const isUrlRequired = contentType === ContentType.VIDEO || contentType === ContentType.PDF;
+  const isUrlRequired =
+    contentType === ContentType.VIDEO ||
+    contentType === ContentType.PDF ||
+    contentType === ContentType.EMBED;
   const isDescriptionRequired = contentType === ContentType.TEXT;
 
   useEffect(() => {
@@ -232,6 +253,7 @@ export function LessonForm({
     { value: ContentType.TEXT, label: "Texto" },
     { value: ContentType.QUIZ, label: "Quiz" },
     { value: ContentType.PDF, label: "PDF" },
+    { value: ContentType.EMBED, label: "Apresentacao" },
   ];
 
   return (
@@ -336,7 +358,9 @@ export function LessonForm({
                             ? "ID do video ou URL (obrigatorio)"
                             : contentType === ContentType.PDF
                               ? "URL do PDF (obrigatorio)"
-                              : "URL do conteudo (opcional)"
+                              : contentType === ContentType.EMBED
+                                ? "URL do embed (gamma.app, canva.com, etc.)"
+                                : "URL do conteudo (opcional)"
                         }
                         {...field}
                         value={field.value || ""}
@@ -359,7 +383,9 @@ export function LessonForm({
                       ? "ID do video Bunny.net, URL de embed/play, ou clique no icone para selecionar"
                       : contentType === ContentType.PDF
                         ? "URL do arquivo PDF"
-                        : "URL do conteudo (opcional)"}
+                        : contentType === ContentType.EMBED
+                          ? "URL de apresentacao (Gamma, Canva, Google Slides, Figma, etc.)"
+                          : "URL do conteudo (opcional)"}
                   </FormDescription>
                   <FormMessage />
 

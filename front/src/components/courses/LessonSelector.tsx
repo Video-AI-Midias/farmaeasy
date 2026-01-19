@@ -32,6 +32,7 @@ import {
   Clock,
   FileIcon,
   FileText,
+  Globe,
   HelpCircle,
   Loader2,
   PlayCircle,
@@ -94,6 +95,7 @@ export function LessonSelector({
     [ContentType.TEXT]: FileText,
     [ContentType.QUIZ]: HelpCircle,
     [ContentType.PDF]: FileIcon,
+    [ContentType.EMBED]: Globe,
   };
 
   const contentTypeLabels: Record<ContentType, string> = {
@@ -101,6 +103,7 @@ export function LessonSelector({
     [ContentType.TEXT]: "Texto",
     [ContentType.QUIZ]: "Quiz",
     [ContentType.PDF]: "PDF",
+    [ContentType.EMBED]: "Apresentacao",
   };
 
   const statusColors: Record<ContentStatus, string> = {

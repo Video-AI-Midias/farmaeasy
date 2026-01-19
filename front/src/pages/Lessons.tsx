@@ -44,6 +44,7 @@ import {
   Edit,
   FileIcon,
   FileText,
+  Globe,
   HelpCircle,
   Loader2,
   PlayCircle,
@@ -136,6 +137,7 @@ function LessonsContent() {
     [ContentType.TEXT]: FileText,
     [ContentType.QUIZ]: HelpCircle,
     [ContentType.PDF]: FileIcon,
+    [ContentType.EMBED]: Globe,
   };
 
   const contentTypeLabels: Record<ContentType, string> = {
@@ -143,6 +145,7 @@ function LessonsContent() {
     [ContentType.TEXT]: "Texto",
     [ContentType.QUIZ]: "Quiz",
     [ContentType.PDF]: "PDF",
+    [ContentType.EMBED]: "Apresentacao",
   };
 
   const formatDuration = (seconds: number | null): string => {

@@ -25,6 +25,7 @@ import {
   Eye,
   FileIcon,
   FileText,
+  Globe,
   HelpCircle,
   Layers,
   Loader2,
@@ -39,6 +40,7 @@ const contentTypeIcons: Record<ContentType, typeof PlayCircle> = {
   [ContentType.TEXT]: FileText,
   [ContentType.QUIZ]: HelpCircle,
   [ContentType.PDF]: FileIcon,
+  [ContentType.EMBED]: Globe,
 };
 
 const contentTypeLabels: Record<ContentType, string> = {
@@ -46,6 +48,7 @@ const contentTypeLabels: Record<ContentType, string> = {
   [ContentType.TEXT]: "Texto",
   [ContentType.QUIZ]: "Quiz",
   [ContentType.PDF]: "PDF",
+  [ContentType.EMBED]: "Apresentacao",
 };
 
 function formatDuration(seconds: number | null): string {

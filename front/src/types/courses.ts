@@ -19,6 +19,49 @@ export enum ContentType {
   TEXT = "text",
   QUIZ = "quiz",
   PDF = "pdf",
+  EMBED = "embed",
+}
+
+// Allowed domains for EMBED content type (must match backend)
+export const ALLOWED_EMBED_DOMAINS = [
+  "gamma.app",
+  "canva.com",
+  "docs.google.com",
+  "slides.google.com",
+  "drive.google.com",
+  "figma.com",
+  "miro.com",
+  "notion.so",
+  "prezi.com",
+  "slideshare.net",
+  "youtube.com",
+  "youtube-nocookie.com",
+  "vimeo.com",
+  "loom.com",
+  "genially.com",
+  "padlet.com",
+  "mentimeter.com",
+  "kahoot.it",
+  "typeform.com",
+  "jotform.com",
+];
+
+/**
+ * Check if a URL is from an allowed embed domain.
+ */
+export function isAllowedEmbedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    let domain = parsed.hostname.toLowerCase();
+    if (domain.startsWith("www.")) {
+      domain = domain.slice(4);
+    }
+    return ALLOWED_EMBED_DOMAINS.some(
+      (allowed) => domain === allowed || domain.endsWith(`.${allowed}`),
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ==============================================================================

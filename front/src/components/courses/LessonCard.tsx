@@ -25,6 +25,7 @@ import {
   Edit,
   FileIcon,
   FileText,
+  Globe,
   HelpCircle,
   MoreVertical,
   PlayCircle,
@@ -60,6 +61,7 @@ export function LessonCard({
     [ContentType.TEXT]: FileText,
     [ContentType.QUIZ]: HelpCircle,
     [ContentType.PDF]: FileIcon,
+    [ContentType.EMBED]: Globe,
   };
 
   const contentTypeLabels: Record<ContentType, string> = {
@@ -67,6 +69,7 @@ export function LessonCard({
     [ContentType.TEXT]: "Texto",
     [ContentType.QUIZ]: "Quiz",
     [ContentType.PDF]: "PDF",
+    [ContentType.EMBED]: "Apresentacao",
   };
 
   const statusColors: Record<ContentStatus, string> = {

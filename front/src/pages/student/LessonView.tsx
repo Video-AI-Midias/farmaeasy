@@ -61,6 +61,7 @@ import {
   Clock,
   FileIcon,
   FileText,
+  Globe,
   HelpCircle,
   Layers,
   Loader2,
@@ -125,6 +126,7 @@ const contentTypeIcons: Record<ContentType, typeof PlayCircle> = {
   [ContentType.TEXT]: FileText,
   [ContentType.QUIZ]: HelpCircle,
   [ContentType.PDF]: FileIcon,
+  [ContentType.EMBED]: Globe,
 };
 
 function formatDuration(seconds: number | null): string {
@@ -731,6 +733,58 @@ function QuizContent({
   );
 }
 
+// Embed lesson content (external iframe - Gamma, Canva, Google Slides, etc.)
+function EmbedContent({
+  lesson,
+  onMarkComplete,
+  onMarkIncomplete,
+  status,
+  isUpdating,
+}: {
+  lesson: LessonInModule;
+  onMarkComplete: () => void;
+  onMarkIncomplete: () => void;
+  status: LessonProgressStatus;
+  isUpdating: boolean;
+}) {
+  if (!lesson.content_url) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Globe className="h-12 w-12 mx-auto mb-2 opacity-50" />
+          <p>Conteudo embed nao disponivel</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Iframe container - fills available space */}
+      <div className="flex-1 min-h-0 relative">
+        <iframe
+          src={lesson.content_url}
+          title={lesson.title}
+          className="absolute inset-0 w-full h-full rounded-lg border-0"
+          allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+        />
+      </div>
+
+      {/* Mark complete button - fixed at bottom */}
+      <div className="flex-shrink-0 pt-4 border-t mt-4">
+        <MarkCompleteButton
+          status={status}
+          isLoading={isUpdating}
+          onMarkComplete={onMarkComplete}
+          onMarkIncomplete={onMarkIncomplete}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function StudentLessonViewContent() {
   const { cursoSlug, aulaSlug } = useParams<{ cursoSlug: string; aulaSlug: string }>();
   const navigate = useNavigate();
@@ -1136,6 +1190,7 @@ export function StudentLessonViewContent() {
                 {lesson.content_type === ContentType.TEXT && "Texto"}
                 {lesson.content_type === ContentType.PDF && "PDF"}
                 {lesson.content_type === ContentType.QUIZ && "Quiz"}
+                {lesson.content_type === ContentType.EMBED && "Apresentacao"}
               </div>
               {lesson.duration_seconds && (
                 <div className="flex items-center gap-1">
@@ -1198,6 +1253,16 @@ export function StudentLessonViewContent() {
 
             {lesson.content_type === ContentType.QUIZ && (
               <QuizContent
+                onMarkComplete={handleMarkComplete}
+                onMarkIncomplete={handleMarkIncomplete}
+                status={lessonStatus}
+                isUpdating={isUpdating}
+              />
+            )}
+
+            {lesson.content_type === ContentType.EMBED && (
+              <EmbedContent
+                lesson={lesson}
                 onMarkComplete={handleMarkComplete}
                 onMarkIncomplete={handleMarkIncomplete}
                 status={lessonStatus}
