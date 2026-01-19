@@ -48,6 +48,16 @@ export const useAuthStore = create<AuthStore>()(
 
       setInitialized: (isInitialized: boolean) => set({ isInitialized }),
 
+      // Set auth from token (for registration by link flow)
+      setAuthFromToken: (token: string, user: User) => {
+        setAccessToken(token);
+        set({
+          user,
+          isAuthenticated: true,
+          isInitialized: true,
+        });
+      },
+
       // Login action
       login: async (credentials: LoginRequest) => {
         // Prevent duplicate login attempts

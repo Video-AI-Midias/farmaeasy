@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { setAccessToken } from "@/lib/api";
 import type { RegistrationLinkFormData } from "@/lib/validators";
 import { useAuthStore } from "@/stores/auth";
 import type {
@@ -47,7 +48,7 @@ export function RegisterByLinkPage() {
   // Extract token from URL fragment (not query params) for security
   const token = useMemo(() => getTokenFromFragment(), []);
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { setUser, setInitialized } = useAuthStore();
 
   const [pageState, setPageState] = useState<PageState>("loading");
   const [linkData, setLinkData] = useState<ValidateLinkResponse | null>(null);
@@ -222,9 +223,19 @@ export function RegisterByLinkPage() {
         setSuccessData(data);
         setPageState("success");
 
-        // Store the access token and redirect after a delay
+        // Store the access token, set user as authenticated, and redirect after a delay
         if (data.access_token) {
-          login(data.access_token);
+          setAccessToken(data.access_token);
+          // Create minimal user object from response - full profile will load on navigation
+          setUser({
+            id: data.user_id,
+            email: data.email,
+            name: data.name,
+            role: "student",
+            is_active: true,
+            created_at: new Date().toISOString(),
+          });
+          setInitialized(true);
           setTimeout(() => {
             navigate("/aluno");
           }, 3000);
@@ -243,7 +254,7 @@ export function RegisterByLinkPage() {
         setIsSubmitting(false);
       }
     },
-    [shortcode, token, login, navigate],
+    [shortcode, token, setUser, setInitialized, navigate],
   );
 
   // Loading state
