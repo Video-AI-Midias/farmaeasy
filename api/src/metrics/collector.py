@@ -178,7 +178,9 @@ class MetricsCollector:
             events: List of events to aggregate
         """
         # Group events by aggregation key
+        # Note: We store dimensions separately since dicts are unhashable
         aggregations: dict[tuple, list[MetricEvent]] = defaultdict(list)
+        dimension_map: dict[tuple, dict[str, str]] = {}
 
         for event in events:
             now = event.created_at or datetime.now(UTC)
@@ -186,41 +188,41 @@ class MetricsCollector:
             hour = now.hour
 
             # Aggregate by event name (global)
-            key = (day_bucket, hour, event.event_name, "default", {})
+            key = (day_bucket, hour, event.event_name, "default")
             aggregations[key].append(event)
+            dimension_map[key] = {}
 
             # For requests, also aggregate by status group
             if event.event_type == EventType.REQUEST and event.status_code:
                 status_group = f"{event.status_code // 100}xx"
                 dims = {"status": status_group}
                 dim_key = generate_dimension_key(dims)
-                key = (day_bucket, hour, "request_by_status", dim_key, dims)
+                key = (day_bucket, hour, "request_by_status", dim_key)
                 aggregations[key].append(event)
+                dimension_map[key] = dims
 
                 # Aggregate by method
                 if event.method:
                     dims = {"method": event.method}
                     dim_key = generate_dimension_key(dims)
-                    key = (day_bucket, hour, "request_by_method", dim_key, dims)
+                    key = (day_bucket, hour, "request_by_method", dim_key)
                     aggregations[key].append(event)
+                    dimension_map[key] = dims
 
                 # Aggregate by path (top endpoints)
                 if event.path:
                     dims = {"path": event.path}
                     dim_key = generate_dimension_key(dims)
-                    key = (day_bucket, hour, "request_by_path", dim_key, dims)
+                    key = (day_bucket, hour, "request_by_path", dim_key)
                     aggregations[key].append(event)
+                    dimension_map[key] = dims
 
         # Process each aggregation
-        for (
-            day_bucket,
-            hour,
-            metric_name,
-            dim_key,
-            dims,
-        ), agg_events in aggregations.items():
+        for key, agg_events in aggregations.items():
+            day_bucket, hour, metric_name, dim_key = key
+            dims = dimension_map.get(key, {})
             await self._upsert_aggregation(
-                day_bucket, hour, metric_name, dim_key, dict(dims), agg_events
+                day_bucket, hour, metric_name, dim_key, dims, agg_events
             )
 
     async def _upsert_aggregation(

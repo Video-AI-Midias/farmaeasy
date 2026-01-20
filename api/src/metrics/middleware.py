@@ -90,6 +90,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         # Skip excluded paths (fast path)
         if self._should_exclude(path):
+            logger.debug("metrics_middleware_skip", path=path, reason="excluded")
             return await call_next(request)
 
         # Record start time
@@ -111,13 +112,26 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         # Emit metric (fire-and-forget, < 1ms)
         # Only emit if emitter is available (may not be initialized during startup)
         if self.emitter is not None:
-            self.emitter.emit_request(
+            result = self.emitter.emit_request(
                 method=request.method,
                 path=normalized_path,
                 status_code=response.status_code,
                 duration_ms=duration_ms,
                 request_id=request_id,
                 user_id=user_id,
+            )
+            logger.debug(
+                "metrics_middleware_emit",
+                path=normalized_path,
+                status_code=response.status_code,
+                duration_ms=round(duration_ms, 2),
+                emit_result=result,
+            )
+        else:
+            logger.warning(
+                "metrics_middleware_no_emitter",
+                path=normalized_path,
+                message="Emitter is None, skipping metrics",
             )
 
         return response
