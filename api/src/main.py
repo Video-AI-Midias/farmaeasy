@@ -69,6 +69,9 @@ class AppState:
     verification_service: VerificationService | None = None
     registration_link_service: RegistrationLinkService | None = None
     attachments_service: Any = None  # AttachmentsService (lazy import)
+    metrics_emitter: Any = None  # MetricsEmitter
+    metrics_service: Any = None  # MetricsQueryService
+    metrics_aggregator: Any = None  # MetricsAggregator
 
 
 app_state = AppState()
@@ -144,6 +147,22 @@ def get_attachments_service():
         msg = "AttachmentsService not initialized"
         raise RuntimeError(msg)
     return app_state.attachments_service
+
+
+def get_metrics_emitter():
+    """Get MetricsEmitter instance from app state."""
+    if app_state.metrics_emitter is None:
+        msg = "MetricsEmitter not initialized"
+        raise RuntimeError(msg)
+    return app_state.metrics_emitter
+
+
+def get_metrics_service():
+    """Get MetricsQueryService instance from app state."""
+    if app_state.metrics_service is None:
+        msg = "MetricsQueryService not initialized"
+        raise RuntimeError(msg)
+    return app_state.metrics_service
 
 
 @asynccontextmanager
@@ -296,10 +315,94 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 message="Running without email service",
             )
 
+    # Initialize Metrics System (requires Cassandra and Redis)
+    if settings.metrics_enabled and app_state.cassandra_session:
+        try:
+            from src.metrics import (
+                MetricsAggregator,
+                MetricsCollector,
+                MetricsEmitter,
+                MetricsQueryService,
+                set_metrics_emitter,
+            )
+            from src.metrics.dependencies import (
+                set_metrics_emitter_getter,
+                set_metrics_service_getter,
+            )
+
+            # Create emitter with Redis for real-time counters
+            app_state.metrics_emitter = MetricsEmitter(
+                redis=redis_client,
+                queue_size=settings.metrics_queue_size,
+                batch_size=settings.metrics_batch_size,
+                flush_interval=settings.metrics_flush_interval,
+            )
+
+            # Create collector for Cassandra batch writes
+            metrics_collector = MetricsCollector(
+                session=app_state.cassandra_session,
+                keyspace=settings.cassandra_keyspace,
+            )
+
+            # Connect emitter to collector
+            app_state.metrics_emitter.set_collector(metrics_collector)
+
+            # Start background worker
+            await app_state.metrics_emitter.start()
+
+            # Set global emitter for decorators
+            set_metrics_emitter(app_state.metrics_emitter)
+
+            # Create query service
+            app_state.metrics_service = MetricsQueryService(
+                session=app_state.cassandra_session,
+                keyspace=settings.cassandra_keyspace,
+                redis=redis_client,
+                emitter=app_state.metrics_emitter,
+            )
+            app.state.metrics_service = app_state.metrics_service
+
+            # Set up dependency injection getters
+            set_metrics_emitter_getter(get_metrics_emitter)
+            set_metrics_service_getter(get_metrics_service)
+
+            # Start aggregator if enabled
+            if settings.metrics_aggregator_enabled:
+                app_state.metrics_aggregator = MetricsAggregator(
+                    session=app_state.cassandra_session,
+                    keyspace=settings.cassandra_keyspace,
+                )
+                await app_state.metrics_aggregator.start(
+                    interval_seconds=settings.metrics_aggregator_interval_seconds
+                )
+                logger.info("metrics_aggregator_started")
+
+            logger.info(
+                "metrics_system_initialized",
+                queue_size=settings.metrics_queue_size,
+                batch_size=settings.metrics_batch_size,
+            )
+        except Exception as e:
+            logger.warning(
+                "metrics_init_skipped",
+                error=str(e),
+                message="Running without metrics collection",
+            )
+
     yield
 
     # Shutdown
     logger.info("shutting_down_application")
+
+    # Stop metrics system
+    if app_state.metrics_aggregator:
+        await app_state.metrics_aggregator.stop()
+    if app_state.metrics_emitter:
+        from src.metrics import set_metrics_emitter
+
+        await app_state.metrics_emitter.stop()
+        set_metrics_emitter(None)
+
     await shutdown_redis()
     await shutdown_async_cassandra()
 
@@ -339,6 +442,39 @@ def create_app() -> FastAPI:
         allow_headers=settings.cors_allow_headers,
         max_age=settings.cors_max_age,
     )
+
+    # Metrics middleware (captures request metrics)
+    # Added after CORS so it measures actual request time
+    if settings.metrics_enabled:
+        from src.metrics.middleware import MetricsMiddleware
+
+        # Create a wrapper that gets emitter from app_state at runtime
+        # This allows the middleware to work even though emitter is initialized later
+        class LazyMetricsMiddleware(MetricsMiddleware):
+            """Metrics middleware that lazily gets emitter from app_state."""
+
+            def __init__(self, app):
+                # Initialize with a placeholder, actual emitter is retrieved at runtime
+                from starlette.middleware.base import BaseHTTPMiddleware
+
+                BaseHTTPMiddleware.__init__(self, app)
+                self.exclude_paths = {
+                    "/health",
+                    "/health/live",
+                    "/health/ready",
+                    "/metrics",
+                    "/docs",
+                    "/redoc",
+                    "/openapi.json",
+                }
+                self.normalize_paths = True
+
+            @property
+            def emitter(self):
+                """Get emitter from app_state at runtime."""
+                return app_state.metrics_emitter
+
+        app.add_middleware(LazyMetricsMiddleware)
 
     # Helper to get request_id from request state or context
     def _get_request_id_safe(request: Request) -> str | None:
@@ -493,6 +629,12 @@ def create_app() -> FastAPI:
     app.include_router(email_admin_router)
     app.include_router(registration_links_router)
     app.include_router(registration_public_router)
+
+    # Metrics router (admin only)
+    # Import directly from router module to avoid circular imports
+    from src.metrics.router import router as metrics_router
+
+    app.include_router(metrics_router)
 
     @app.get("/", include_in_schema=False)
     async def root(request: Request) -> dict[str, str]:

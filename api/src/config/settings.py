@@ -274,6 +274,30 @@ class Settings(BaseSettings):
         default="FarmaEasy", description="Sender display name"
     )
 
+    # Metrics (Pre-aggregated analytics)
+    metrics_enabled: bool = Field(default=True, description="Enable metrics collection")
+    metrics_queue_size: int = Field(
+        default=10000, description="Max events in queue before dropping"
+    )
+    metrics_batch_size: int = Field(
+        default=100, description="Events per batch write to Cassandra"
+    )
+    metrics_flush_interval: float = Field(
+        default=1.0, description="Max seconds between batch flushes"
+    )
+    metrics_events_ttl_days: int = Field(
+        default=7, description="TTL for raw events in days"
+    )
+    metrics_hourly_ttl_days: int = Field(
+        default=90, description="TTL for hourly aggregations in days"
+    )
+    metrics_aggregator_enabled: bool = Field(
+        default=True, description="Enable background hourly→daily rollup"
+    )
+    metrics_aggregator_interval_seconds: int = Field(
+        default=3600, description="Interval between aggregation runs (1 hour)"
+    )
+
     @property
     def is_development(self) -> bool:
         """Check if running in development mode."""
