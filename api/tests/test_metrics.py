@@ -169,7 +169,7 @@ class TestMetricsEmitter:
         result = emitter.emit(event)
 
         assert result is False
-        assert emitter._events_dropped == 1
+        assert emitter._events_dropped == 1  # noqa: SLF001
 
     def test_emit_request(self, emitter):
         """Test emit_request helper."""
@@ -258,7 +258,7 @@ class TestMetricsMiddleware:
         middleware.normalize_paths = True
 
         path = "/v1/courses/550e8400-e29b-41d4-a716-446655440000/lessons"
-        normalized = middleware._normalize_path(path)
+        normalized = middleware._normalize_path(path)  # noqa: SLF001
 
         assert ":id" in normalized
         assert "550e8400" not in normalized
@@ -269,7 +269,7 @@ class TestMetricsMiddleware:
         middleware.normalize_paths = True
 
         path = "/v1/users/12345/posts/67890"
-        normalized = middleware._normalize_path(path)
+        normalized = middleware._normalize_path(path)  # noqa: SLF001
 
         assert "12345" not in normalized
         assert "67890" not in normalized
@@ -279,17 +279,17 @@ class TestMetricsMiddleware:
         middleware = MetricsMiddleware.__new__(MetricsMiddleware)
         middleware.exclude_paths = {"/health", "/metrics"}
 
-        assert middleware._should_exclude("/health") is True
-        assert middleware._should_exclude("/metrics") is True
-        assert middleware._should_exclude("/v1/courses") is False
+        assert middleware._should_exclude("/health") is True  # noqa: SLF001
+        assert middleware._should_exclude("/metrics") is True  # noqa: SLF001
+        assert middleware._should_exclude("/v1/courses") is False  # noqa: SLF001
 
     def test_should_exclude_prefix_match(self):
         """Test path exclusion with prefix match."""
         middleware = MetricsMiddleware.__new__(MetricsMiddleware)
         middleware.exclude_paths = {"/health"}
 
-        assert middleware._should_exclude("/health/live") is True
-        assert middleware._should_exclude("/health/ready") is True
+        assert middleware._should_exclude("/health/live") is True  # noqa: SLF001
+        assert middleware._should_exclude("/health/ready") is True  # noqa: SLF001
 
 
 # ==============================================================================
