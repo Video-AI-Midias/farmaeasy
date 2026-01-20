@@ -11,6 +11,7 @@ import { DashboardPage } from "@/pages/Dashboard";
 import { ForgotPasswordPage } from "@/pages/ForgotPassword";
 import { LessonsPage } from "@/pages/Lessons";
 import { LoginPage } from "@/pages/Login";
+import { MetricsDashboardPage } from "@/pages/MetricsDashboard";
 import { ModuleDetailPage } from "@/pages/ModuleDetail";
 import { ModulesPage } from "@/pages/Modules";
 import { RegisterPage } from "@/pages/Register";
@@ -151,6 +152,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="admin">
             <AdminNotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/metricas"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <MetricsDashboardPage />
           </ProtectedRoute>
         }
       />

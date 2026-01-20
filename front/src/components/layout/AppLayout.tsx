@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNotificationWebSocket } from "@/hooks/useNotificationWebSocket";
 import { cn } from "@/lib/utils";
 import {
+  Activity,
   Bell,
   BookOpen,
   GraduationCap,
@@ -233,6 +234,20 @@ export function AppLayout({ children }: AppLayoutProps) {
                             >
                               <Bell className="h-4 w-4" />
                               Notificacoes
+                            </Link>
+                            <Link
+                              to="/admin/metricas"
+                              onClick={handleNavClick}
+                              className={cn(
+                                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                                "hover:bg-accent hover:text-accent-foreground",
+                                isActive("/admin/metricas")
+                                  ? "bg-accent/50 text-accent-foreground"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              <Activity className="h-4 w-4" />
+                              Metricas
                             </Link>
                           </div>
                         </AccordionContent>

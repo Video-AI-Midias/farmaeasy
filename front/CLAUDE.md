@@ -4,11 +4,13 @@ Interface React para sistema de gestao de farmacia.
 
 ## Stack
 
-- **Runtime**: Node.js / npm
+- **Runtime**: Bun (gerenciador de pacotes e runtime)
 - **Framework**: React 19 + TypeScript 5.7
 - **Build**: Vite 6
 - **Styling**: Tailwind CSS v4 + shadcn/ui
 - **State**: Zustand
+- **Data Fetching**: TanStack Query (React Query)
+- **Charts**: Recharts
 - **Forms**: React Hook Form + Zod
 - **Icons**: Lucide React
 - **Testing**: Vitest + React Testing Library
@@ -35,25 +37,29 @@ src/
 
 ```bash
 # Dev
-npm install                 # Instalar deps
-npm run dev                 # Dev server (localhost:3001)
-npm run build               # Production build
-npm run preview             # Preview build
+bun install                 # Instalar deps
+bun dev                     # Dev server (localhost:3001)
+bun run build               # Production build
+bun run preview             # Preview build
 
 # Testes
-npm run test                # Vitest watch mode
-npm run test -- --run       # Single run
-npm run test:ui             # UI mode
-npm run test:coverage       # Com coverage
+bun test                    # Vitest watch mode
+bun test --run              # Single run
+bun run test:ui             # UI mode
+bun run test:coverage       # Com coverage
 
 # Lint & Format
-npm run lint                # Biome check
-npm run lint:fix            # Auto-fix
-npm run format              # Format only
-npm run typecheck           # TypeScript validation
+bun run lint                # Biome check
+bun run lint:fix            # Auto-fix
+bun run format              # Format only
+bun run typecheck           # TypeScript validation
 
 # Validação completa
-npm run test -- --run && npm run lint && npm run typecheck
+bun test --run && bun run lint && bun run typecheck
+
+# Adicionar dependências
+bun add <package>           # Produção
+bun add -d <package>        # Dev dependency
 ```
 
 ## Convenções de Código
@@ -70,12 +76,12 @@ npm run test -- --run && npm run lint && npm run typecheck
 Adicionar componentes:
 
 ```bash
-npx shadcn@latest add button
-npx shadcn@latest add card
-npx shadcn@latest add dialog
-npx shadcn@latest add form
-npx shadcn@latest add input
-npx shadcn@latest add table
+bunx --bun shadcn@latest add button
+bunx --bun shadcn@latest add card
+bunx --bun shadcn@latest add dialog
+bunx --bun shadcn@latest add form
+bunx --bun shadcn@latest add input
+bunx --bun shadcn@latest add table
 ```
 
 Componentes ficam em `src/components/ui/`.

@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import {
+  Activity,
   Bell,
   BookOpen,
   ChevronDown,
@@ -156,6 +157,12 @@ export function MainNav() {
               <Link to="/admin/notificacoes" className="group cursor-pointer">
                 <Bell className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
                 Notificacoes
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/admin/metricas" className="group cursor-pointer">
+                <Activity className="mr-2 h-4 w-4 text-foreground transition-colors group-hover:text-accent-foreground" />
+                Metricas
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
