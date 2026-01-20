@@ -16,6 +16,7 @@ import structlog
 from fastapi import APIRouter, Query, status
 
 from src.auth.dependencies import AdminUser, CurrentUser, OptionalUser
+from src.metrics import EventName, emit_business_event
 
 from .dependencies import (
     AuthServiceDep,
@@ -86,6 +87,13 @@ async def create_comment(
             author_avatar=user_avatar,
             rating=data.rating,
             is_review=data.is_review,
+        )
+
+        # Emit business event for metrics
+        emit_business_event(
+            event_name=EventName.COMMENT_CREATED,
+            user_id=author_id,
+            lesson_id=data.lesson_id,
         )
 
         # Process notifications in background (don't fail comment creation)

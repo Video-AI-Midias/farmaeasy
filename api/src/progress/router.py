@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from src.acquisitions.dependencies import AcquisitionServiceDep
 from src.auth.dependencies import CurrentUser
 from src.courses.dependencies import CourseServiceDep
+from src.metrics import EventName, emit_business_event
 
 from .dependencies import ProgressServiceDep, handle_progress_error
 from .schemas import (
@@ -150,6 +151,15 @@ async def mark_lesson_complete(
             course_id=data.course_id,
             module_id=data.module_id,
         )
+
+        # Emit business event for metrics
+        emit_business_event(
+            event_name=EventName.LESSON_COMPLETED,
+            user_id=UUID(str(user.id)),
+            course_id=data.course_id,
+            lesson_id=data.lesson_id,
+        )
+
         return LessonProgressResponse.from_entity(progress)
     except ProgressError as e:
         raise handle_progress_error(e) from e
@@ -321,6 +331,14 @@ async def enroll_in_course(
             user_id=user_id,
             course_id=data.course_id,
         )
+
+        # Emit business event for metrics
+        emit_business_event(
+            event_name=EventName.ENROLLMENT_CREATED,
+            user_id=user_id,
+            course_id=data.course_id,
+        )
+
         return EnrollmentResponse(
             course_id=enrollment.course_id,
             user_id=enrollment.user_id,
