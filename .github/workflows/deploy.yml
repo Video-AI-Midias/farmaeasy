@@ -59,6 +59,8 @@ jobs:
               - 'api/**'
             front:
               - 'front/**'
+              - 'package.json'       # Root workspace config affects front build
+              - 'package-lock.json'  # Root lock file (npm workspaces)
 
   # ==========================================================================
   # API CI - Lint & Test

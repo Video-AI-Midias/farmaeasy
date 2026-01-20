@@ -65,7 +65,7 @@ export async function getDashboardMetrics(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<DashboardMetrics>(`/v1/admin/metrics${query}`);
+  const response = await api.get<DashboardMetrics>(`/admin/metrics${query}`);
   return response.data;
 }
 
@@ -85,7 +85,7 @@ export async function getRequestMetrics(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<RequestMetrics>(`/v1/admin/metrics/requests${query}`);
+  const response = await api.get<RequestMetrics>(`/admin/metrics/requests${query}`);
   return response.data;
 }
 
@@ -105,7 +105,7 @@ export async function getBusinessMetrics(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<BusinessMetrics>(`/v1/admin/metrics/business${query}`);
+  const response = await api.get<BusinessMetrics>(`/admin/metrics/business${query}`);
   return response.data;
 }
 
@@ -125,7 +125,7 @@ export async function getUserMetrics(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<UserMetrics>(`/v1/admin/metrics/users${query}`);
+  const response = await api.get<UserMetrics>(`/admin/metrics/users${query}`);
   return response.data;
 }
 
@@ -145,7 +145,7 @@ export async function getCourseMetrics(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<CourseMetrics>(`/v1/admin/metrics/courses${query}`);
+  const response = await api.get<CourseMetrics>(`/admin/metrics/courses${query}`);
   return response.data;
 }
 
@@ -171,7 +171,7 @@ export async function getTimeSeries(
   }
 
   const query = buildQueryString(params);
-  const response = await api.get<TimeSeriesResponse>(`/v1/admin/metrics/timeseries${query}`);
+  const response = await api.get<TimeSeriesResponse>(`/admin/metrics/timeseries${query}`);
   return response.data;
 }
 
@@ -179,7 +179,7 @@ export async function getTimeSeries(
  * Get real-time counters from Redis.
  */
 export async function getRealtimeCounters(): Promise<RealtimeCounters> {
-  const response = await api.get<RealtimeCounters>("/v1/admin/metrics/realtime");
+  const response = await api.get<RealtimeCounters>("/admin/metrics/realtime");
   return response.data;
 }
 
@@ -187,7 +187,7 @@ export async function getRealtimeCounters(): Promise<RealtimeCounters> {
  * Get metrics system health status.
  */
 export async function getMetricsHealth(): Promise<MetricsHealthResponse> {
-  const response = await api.get<MetricsHealthResponse>("/v1/admin/metrics/health");
+  const response = await api.get<MetricsHealthResponse>("/admin/metrics/health");
   return response.data;
 }
 
