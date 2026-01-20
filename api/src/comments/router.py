@@ -332,6 +332,14 @@ async def add_reaction(
             reaction_type=data.reaction_type,
         )
 
+        # Emit business event for metrics (only if adding, not toggling off)
+        if not is_toggle_off:
+            emit_business_event(
+                event_name=EventName.REACTION_ADDED,
+                user_id=reactor_id,
+                lesson_id=lesson_id,
+            )
+
         # Send notification only if adding new reaction (not toggling off)
         if notification_service and not is_toggle_off:
             try:

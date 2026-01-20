@@ -57,6 +57,7 @@ from src.auth.service import (
 )
 from src.auth.validators import format_cpf, validate_cpf
 from src.config.settings import get_settings
+from src.metrics import EventName, emit_business_event
 
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -164,8 +165,16 @@ async def register(
     Creates a user with role=USER. The user needs to subscribe
     to access course content.
     """
+
     try:
         user = await auth_service.register_user(data)
+
+        # Emit business event for metrics
+        emit_business_event(
+            event_name=EventName.USER_REGISTERED,
+            user_id=user.id,
+        )
+
         return auth_service.to_response(user)
     except UserExistsError as e:
         raise handle_auth_error(e) from e
@@ -192,6 +201,7 @@ async def login(
     Returns access token in response body.
     Sets refresh token in httpOnly cookie.
     """
+
     settings = get_settings()
     user_agent, ip_address = client_info
 
@@ -202,6 +212,12 @@ async def login(
         )
     except (InvalidCredentialsError, UserInactiveError, SessionLimitExceededError) as e:
         raise handle_auth_error(e) from e
+
+    # Emit business event for metrics (after successful auth)
+    emit_business_event(
+        event_name=EventName.USER_LOGIN,
+        user_id=user.id,
+    )
 
     # Set refresh token in httpOnly cookie
     response.set_cookie(
