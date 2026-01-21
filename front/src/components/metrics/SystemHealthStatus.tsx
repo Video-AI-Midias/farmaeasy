@@ -1,15 +1,25 @@
 /**
- * System health status component.
+ * System health status component with CPU, memory, and disk metrics.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { MetricsHealthResponse } from "@/types/metrics";
+import type { DiskInfo, MetricsHealthResponse } from "@/types/metrics";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Activity, CheckCircle2, Clock, Database, HardDrive, Server, XCircle } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  Clock,
+  Cpu,
+  Database,
+  HardDrive,
+  MemoryStick,
+  Server,
+  XCircle,
+} from "lucide-react";
 
 interface SystemHealthStatusProps {
   data: MetricsHealthResponse | undefined;
@@ -42,6 +52,8 @@ export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStat
     ? format(parseISO(data.last_flush_at), "HH:mm:ss", { locale: ptBR })
     : "N/A";
 
+  const sysRes = data.system_resources;
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -64,8 +76,46 @@ export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStat
           <ConnectionStatus label="Redis" connected={data.redis_connected} icon={HardDrive} />
         </div>
 
+        {/* System Resources - CPU & Memory */}
+        {sysRes && (
+          <div className="space-y-3 pt-2 border-t">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Recursos do Sistema
+            </p>
+
+            {/* CPU */}
+            <ResourceBar
+              icon={Cpu}
+              label="CPU"
+              value={sysRes.cpu.usage_percent}
+              detail={`${sysRes.cpu.cores_logical} cores${sysRes.cpu.load_avg_1m !== null ? ` • Load: ${sysRes.cpu.load_avg_1m}` : ""}`}
+            />
+
+            {/* Memory */}
+            <ResourceBar
+              icon={MemoryStick}
+              label="Memória"
+              value={sysRes.memory.usage_percent}
+              detail={`${formatBytes(sysRes.memory.used_bytes)} / ${formatBytes(sysRes.memory.total_bytes)}`}
+            />
+
+            {/* Disk(s) */}
+            {sysRes.disks.map((disk) => (
+              <DiskBar key={disk.mount_point} disk={disk} />
+            ))}
+
+            {/* Process Count */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+              <span>Processos ativos</span>
+              <span className="font-medium text-foreground">
+                {sysRes.process_count.toLocaleString("pt-BR")}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Queue Status */}
-        <div className="space-y-2">
+        <div className="space-y-2 pt-2 border-t">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Fila de Eventos</span>
             <span className="font-medium">
@@ -169,6 +219,63 @@ function ConnectionStatus({ label, connected, icon: Icon }: ConnectionStatusProp
   );
 }
 
+interface ResourceBarProps {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  detail: string;
+}
+
+function ResourceBar({ icon: Icon, label, value, detail }: ResourceBarProps) {
+  const getBarColor = (percent: number) => {
+    if (percent >= 90) return "bg-red-500";
+    if (percent >= 70) return "bg-yellow-500";
+    return "bg-emerald-500";
+  };
+
+  const getTextColor = (percent: number) => {
+    if (percent >= 90) return "text-red-600 dark:text-red-400";
+    if (percent >= 70) return "text-yellow-600 dark:text-yellow-400";
+    return "text-emerald-600 dark:text-emerald-400";
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">{label}</span>
+        </div>
+        <span className={cn("text-sm font-semibold", getTextColor(value))}>
+          {value.toFixed(1)}%
+        </span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all duration-300", getBarColor(value))}
+          style={{ width: `${Math.min(value, 100)}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+interface DiskBarProps {
+  disk: DiskInfo;
+}
+
+function DiskBar({ disk }: DiskBarProps) {
+  return (
+    <ResourceBar
+      icon={HardDrive}
+      label={`Disco (${disk.mount_point})`}
+      value={disk.usage_percent}
+      detail={`${formatBytes(disk.used_bytes)} / ${formatBytes(disk.total_bytes)} • ${formatBytes(disk.free_bytes)} livre`}
+    />
+  );
+}
+
 interface StatItemProps {
   icon: React.ElementType;
   label: string;
@@ -209,6 +316,19 @@ function formatUptime(seconds: number): string {
   return `${minutes}m`;
 }
 
+function formatBytes(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
 function SystemHealthSkeleton() {
   return (
     <Card>
@@ -222,6 +342,12 @@ function SystemHealthSkeleton() {
         <div className="grid grid-cols-2 gap-4">
           <Skeleton className="h-16 rounded-lg" />
           <Skeleton className="h-16 rounded-lg" />
+        </div>
+        <div className="space-y-3 pt-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
         </div>
         <Skeleton className="h-8 w-full" />
         <div className="grid grid-cols-2 gap-4 pt-2">

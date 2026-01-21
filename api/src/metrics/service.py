@@ -14,10 +14,14 @@ from .models import EventName, get_day_bucket, get_hour_bucket, get_month_bucket
 from .schemas import (
     BusinessMetrics,
     CourseMetrics,
+    CpuInfo,
     DashboardMetrics,
+    DiskInfo,
+    MemoryInfo,
     MetricsHealthResponse,
     RealtimeCounters,
     RequestMetrics,
+    SystemResourcesInfo,
     TimeSeriesPoint,
     TimeSeriesResponse,
     UserMetrics,
@@ -691,6 +695,86 @@ class MetricsQueryService:
     # Health Status
     # ==========================================================================
 
+    def _collect_system_resources(self) -> SystemResourcesInfo:
+        """Collect system resources metrics using psutil.
+
+        Returns:
+            SystemResourcesInfo with CPU, memory, and disk metrics
+        """
+        import os
+
+        import psutil
+
+        now = datetime.now(UTC)
+
+        # CPU info
+        cpu_percent = psutil.cpu_percent(interval=None)
+        cores_physical = psutil.cpu_count(logical=False) or 1
+        cores_logical = psutil.cpu_count(logical=True) or 1
+
+        # Load average (Unix only)
+        load_avg_1m = None
+        load_avg_5m = None
+        load_avg_15m = None
+        if hasattr(os, "getloadavg"):
+            try:
+                load = os.getloadavg()
+                load_avg_1m = round(load[0], 2)
+                load_avg_5m = round(load[1], 2)
+                load_avg_15m = round(load[2], 2)
+            except OSError:
+                pass
+
+        cpu_info = CpuInfo(
+            usage_percent=round(cpu_percent, 1),
+            cores_physical=cores_physical,
+            cores_logical=cores_logical,
+            load_avg_1m=load_avg_1m,
+            load_avg_5m=load_avg_5m,
+            load_avg_15m=load_avg_15m,
+        )
+
+        # Memory info
+        mem = psutil.virtual_memory()
+        memory_info = MemoryInfo(
+            total_bytes=mem.total,
+            available_bytes=mem.available,
+            used_bytes=mem.used,
+            usage_percent=round(mem.percent, 1),
+        )
+
+        # Disk info (only physical disks, skip special filesystems)
+        disks: list[DiskInfo] = []
+        excluded_fstypes = {"squashfs", "tmpfs", "devtmpfs", "overlay", "proc", "sysfs"}
+        for partition in psutil.disk_partitions(all=False):
+            if partition.fstype in excluded_fstypes:
+                continue
+            try:
+                usage = psutil.disk_usage(partition.mountpoint)
+                disks.append(
+                    DiskInfo(
+                        mount_point=partition.mountpoint,
+                        total_bytes=usage.total,
+                        used_bytes=usage.used,
+                        free_bytes=usage.free,
+                        usage_percent=round(usage.percent, 1),
+                    )
+                )
+            except (PermissionError, OSError):
+                # Skip inaccessible partitions
+                continue
+
+        # Process count
+        process_count = len(psutil.pids())
+
+        return SystemResourcesInfo(
+            cpu=cpu_info,
+            memory=memory_info,
+            disks=disks,
+            process_count=process_count,
+            collected_at=now,
+        )
+
     async def get_health(self) -> MetricsHealthResponse:
         """Get metrics system health status.
 
@@ -735,6 +819,13 @@ class MetricsQueryService:
             except Exception:
                 logger.debug("metrics_health_redis_check_failed")
 
+        # Collect system resources
+        system_resources = None
+        try:
+            system_resources = self._collect_system_resources()
+        except Exception:
+            logger.exception("metrics_health_system_resources_error")
+
         healthy = emitter_running and cassandra_connected
 
         return MetricsHealthResponse(
@@ -749,4 +840,5 @@ class MetricsQueryService:
             events_dropped_total=events_dropped,
             last_flush_at=last_flush_at,
             uptime_seconds=uptime_seconds,
+            system_resources=system_resources,
         )

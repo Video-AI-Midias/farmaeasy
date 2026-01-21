@@ -126,6 +126,38 @@ export interface RealtimeCounters {
   bucket: string;
 }
 
+export interface CpuInfo {
+  usage_percent: number;
+  cores_physical: number;
+  cores_logical: number;
+  load_avg_1m: number | null;
+  load_avg_5m: number | null;
+  load_avg_15m: number | null;
+}
+
+export interface MemoryInfo {
+  total_bytes: number;
+  available_bytes: number;
+  used_bytes: number;
+  usage_percent: number;
+}
+
+export interface DiskInfo {
+  mount_point: string;
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+  usage_percent: number;
+}
+
+export interface SystemResourcesInfo {
+  cpu: CpuInfo;
+  memory: MemoryInfo;
+  disks: DiskInfo[];
+  process_count: number;
+  collected_at: string;
+}
+
 export interface MetricsHealthResponse {
   healthy: boolean;
   emitter_running: boolean;
@@ -138,6 +170,7 @@ export interface MetricsHealthResponse {
   events_dropped_total: number;
   last_flush_at: string | null;
   uptime_seconds: number;
+  system_resources: SystemResourcesInfo | null;
 }
 
 // ==============================================================================

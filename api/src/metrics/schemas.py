@@ -232,6 +232,65 @@ class MetricsSummary(BaseModel):
 
 
 # ==============================================================================
+# System Resources Schemas
+# ==============================================================================
+
+
+class CpuInfo(BaseModel):
+    """CPU usage information."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    usage_percent: float = Field(description="Overall CPU usage percentage")
+    cores_physical: int = Field(description="Number of physical CPU cores")
+    cores_logical: int = Field(description="Number of logical CPU cores")
+    load_avg_1m: float | None = Field(
+        default=None, description="Load average 1 minute (Unix only)"
+    )
+    load_avg_5m: float | None = Field(
+        default=None, description="Load average 5 minutes (Unix only)"
+    )
+    load_avg_15m: float | None = Field(
+        default=None, description="Load average 15 minutes (Unix only)"
+    )
+
+
+class MemoryInfo(BaseModel):
+    """Memory usage information."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total_bytes: int = Field(description="Total physical memory in bytes")
+    available_bytes: int = Field(description="Available memory in bytes")
+    used_bytes: int = Field(description="Used memory in bytes")
+    usage_percent: float = Field(description="Memory usage percentage")
+
+
+class DiskInfo(BaseModel):
+    """Disk usage information for a mount point."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    mount_point: str = Field(description="Disk mount point path")
+    total_bytes: int = Field(description="Total disk space in bytes")
+    used_bytes: int = Field(description="Used disk space in bytes")
+    free_bytes: int = Field(description="Free disk space in bytes")
+    usage_percent: float = Field(description="Disk usage percentage")
+
+
+class SystemResourcesInfo(BaseModel):
+    """Complete system resources information."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    cpu: CpuInfo = Field(description="CPU usage information")
+    memory: MemoryInfo = Field(description="Memory usage information")
+    disks: list[DiskInfo] = Field(description="Disk usage for all mount points")
+    process_count: int = Field(description="Total number of running processes")
+    collected_at: datetime = Field(description="When metrics were collected")
+
+
+# ==============================================================================
 # Admin Response Schemas
 # ==============================================================================
 
@@ -252,3 +311,6 @@ class MetricsHealthResponse(BaseModel):
     events_dropped_total: int = Field(description="Total events dropped")
     last_flush_at: datetime | None = Field(description="Last batch flush timestamp")
     uptime_seconds: float = Field(description="Worker uptime in seconds")
+    system_resources: SystemResourcesInfo | None = Field(
+        default=None, description="System resources (CPU, memory, disk)"
+    )
