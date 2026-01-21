@@ -743,12 +743,26 @@ class MetricsQueryService:
             usage_percent=round(mem.percent, 1),
         )
 
-        # Disk info (only physical disks, skip special filesystems)
+        # Disk info (only physical disks, skip special filesystems and bind mounts)
         disks: list[DiskInfo] = []
         excluded_fstypes = {"squashfs", "tmpfs", "devtmpfs", "overlay", "proc", "sysfs"}
+        # Exclude bind mounts (files mounted as config in containers)
+        excluded_prefixes = ("/etc/", "/app/", "/run/", "/sys/", "/proc/", "/dev/")
+        seen_devices: set[str] = set()
+
         for partition in psutil.disk_partitions(all=False):
             if partition.fstype in excluded_fstypes:
                 continue
+
+            # Skip bind mounts of files (mount points under excluded prefixes)
+            if any(partition.mountpoint.startswith(p) for p in excluded_prefixes):
+                continue
+
+            # Skip duplicate devices (same physical disk mounted multiple times)
+            if partition.device in seen_devices:
+                continue
+            seen_devices.add(partition.device)
+
             try:
                 usage = psutil.disk_usage(partition.mountpoint)
                 disks.append(

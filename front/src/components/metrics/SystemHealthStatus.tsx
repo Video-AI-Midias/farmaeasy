@@ -1,17 +1,19 @@
 /**
  * System health status component with CPU, memory, and disk metrics.
+ * Compact UI with collapsible disk section.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { DiskInfo, MetricsHealthResponse } from "@/types/metrics";
+import type { MetricsHealthResponse } from "@/types/metrics";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Activity,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Cpu,
   Database,
@@ -20,6 +22,13 @@ import {
   Server,
   XCircle,
 } from "lucide-react";
+import { useState } from "react";
+
+// Thresholds para cores
+const THRESHOLDS = {
+  warning: 60, // Amarelo >= 60%
+  critical: 85, // Vermelho >= 85%
+};
 
 interface SystemHealthStatusProps {
   data: MetricsHealthResponse | undefined;
@@ -27,6 +36,8 @@ interface SystemHealthStatusProps {
 }
 
 export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStatusProps) {
+  const [disksOpen, setDisksOpen] = useState(false);
+
   if (isLoading) {
     return <SystemHealthSkeleton />;
   }
@@ -54,6 +65,27 @@ export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStat
 
   const sysRes = data.system_resources;
 
+  // Filtrar discos: apenas partições principais (não bind mounts de arquivos)
+  const filteredDisks =
+    sysRes?.disks.filter((disk) => {
+      // Aceitar apenas mount points que são diretórios raiz ou comuns
+      const validMounts = ["/", "/home", "/var", "/tmp", "/opt", "/usr", "/data", "/mnt", "/media"];
+      // Verificar se é um dos mount points válidos ou se começa com /mnt/ ou /media/
+      return (
+        validMounts.includes(disk.mount_point) ||
+        disk.mount_point.startsWith("/mnt/") ||
+        disk.mount_point.startsWith("/media/") ||
+        disk.mount_point.startsWith("/data/")
+      );
+    }) || [];
+
+  // Se não houver discos após filtragem, mostrar todos (fallback)
+  const disksToShow = filteredDisks.length > 0 ? filteredDisks : sysRes?.disks || [];
+
+  // Separar disco principal (/) dos demais
+  const mainDisk = disksToShow.find((d) => d.mount_point === "/");
+  const otherDisks = disksToShow.filter((d) => d.mount_point !== "/");
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -65,9 +97,9 @@ export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStat
           <HealthBadge healthy={data.healthy} />
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Connection Status */}
-        <div className="grid grid-cols-2 gap-4">
+      <CardContent className="space-y-3">
+        {/* Connection Status - Compact */}
+        <div className="grid grid-cols-2 gap-2">
           <ConnectionStatus
             label="Cassandra"
             connected={data.cassandra_connected}
@@ -76,90 +108,140 @@ export function SystemHealthStatus({ data, isLoading = false }: SystemHealthStat
           <ConnectionStatus label="Redis" connected={data.redis_connected} icon={HardDrive} />
         </div>
 
-        {/* System Resources - CPU & Memory */}
+        {/* System Resources */}
         {sysRes && (
-          <div className="space-y-3 pt-2 border-t">
+          <div className="space-y-2 pt-2 border-t">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Recursos do Sistema
             </p>
 
-            {/* CPU */}
-            <ResourceBar
+            {/* CPU - Inline compact */}
+            <CompactResourceRow
               icon={Cpu}
               label="CPU"
               value={sysRes.cpu.usage_percent}
               detail={`${sysRes.cpu.cores_logical} cores${sysRes.cpu.load_avg_1m !== null ? ` • Load: ${sysRes.cpu.load_avg_1m}` : ""}`}
             />
 
-            {/* Memory */}
-            <ResourceBar
+            {/* Memory - Inline compact */}
+            <CompactResourceRow
               icon={MemoryStick}
               label="Memória"
               value={sysRes.memory.usage_percent}
               detail={`${formatBytes(sysRes.memory.used_bytes)} / ${formatBytes(sysRes.memory.total_bytes)}`}
             />
 
-            {/* Disk(s) */}
-            {sysRes.disks.map((disk) => (
-              <DiskBar key={disk.mount_point} disk={disk} />
-            ))}
+            {/* Disk principal + acordeão para outros */}
+            {mainDisk && (
+              <CompactResourceRow
+                icon={HardDrive}
+                label="Disco"
+                value={mainDisk.usage_percent}
+                detail={`${formatBytes(mainDisk.used_bytes)} / ${formatBytes(mainDisk.total_bytes)}`}
+              />
+            )}
 
-            {/* Process Count */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-              <span>Processos ativos</span>
-              <span className="font-medium text-foreground">
-                {sysRes.process_count.toLocaleString("pt-BR")}
-              </span>
+            {/* Acordeão para discos adicionais */}
+            {otherDisks.length > 0 && (
+              <Collapsible open={disksOpen} onOpenChange={setDisksOpen}>
+                <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1">
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 transition-transform duration-200",
+                      disksOpen && "rotate-180",
+                    )}
+                  />
+                  <span>
+                    {disksOpen ? "Ocultar" : "Mostrar"} {otherDisks.length} disco
+                    {otherDisks.length > 1 ? "s" : ""}
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 pt-2">
+                  {otherDisks.map((disk) => (
+                    <CompactResourceRow
+                      key={disk.mount_point}
+                      icon={HardDrive}
+                      label={disk.mount_point}
+                      value={disk.usage_percent}
+                      detail={`${formatBytes(disk.free_bytes)} livre`}
+                      compact
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Process Count - inline */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-muted-foreground">Processos ativos</span>
+              <span className="font-medium">{sysRes.process_count.toLocaleString("pt-BR")}</span>
             </div>
           </div>
         )}
 
-        {/* Queue Status */}
-        <div className="space-y-2 pt-2 border-t">
-          <div className="flex items-center justify-between text-sm">
+        {/* Queue Status - Compact */}
+        <div className="pt-2 border-t">
+          <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-muted-foreground">Fila de Eventos</span>
             <span className="font-medium">
               {data.queue_size.toLocaleString("pt-BR")} /{" "}
               {data.queue_capacity.toLocaleString("pt-BR")}
             </span>
           </div>
-          <Progress value={data.queue_utilization * 100} className="h-2" />
-          <p className="text-xs text-muted-foreground">
-            {(data.queue_utilization * 100).toFixed(1)}% utilizado
-          </p>
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-300",
+                getBarColor(data.queue_utilization * 100),
+              )}
+              style={{ width: `${Math.min(data.queue_utilization * 100, 100)}%` }}
+            />
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-          <StatItem
+        {/* Stats Grid - Compact 2x2 */}
+        <div className="grid grid-cols-4 gap-2 pt-2 border-t text-xs">
+          <StatItemCompact
             icon={Server}
             label="Emitter"
             value={data.emitter_running ? "Ativo" : "Parado"}
             variant={data.emitter_running ? "success" : "error"}
           />
-          <StatItem icon={Clock} label="Uptime" value={uptimeFormatted} />
-          <StatItem
+          <StatItemCompact icon={Clock} label="Uptime" value={uptimeFormatted} />
+          <StatItemCompact
             icon={CheckCircle2}
             label="Processados"
             value={data.events_processed_total.toLocaleString("pt-BR")}
+            variant="success"
           />
-          <StatItem
+          <StatItemCompact
             icon={XCircle}
             label="Descartados"
             value={data.events_dropped_total.toLocaleString("pt-BR")}
-            variant={data.events_dropped_total > 0 ? "warning" : "default"}
+            variant={data.events_dropped_total > 0 ? "error" : "default"}
           />
         </div>
 
-        {/* Last Flush */}
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground">
-            Último flush: <span className="font-medium">{lastFlush}</span>
-          </p>
+        {/* Last Flush - inline */}
+        <div className="text-xs text-muted-foreground pt-1 border-t">
+          Último flush: <span className="font-medium">{lastFlush}</span>
         </div>
       </CardContent>
     </Card>
   );
+}
+
+// Helper functions para cores
+function getBarColor(percent: number): string {
+  if (percent >= THRESHOLDS.critical) return "bg-red-500";
+  if (percent >= THRESHOLDS.warning) return "bg-yellow-500";
+  return "bg-emerald-500";
+}
+
+function getTextColor(percent: number): string {
+  if (percent >= THRESHOLDS.critical) return "text-red-500";
+  if (percent >= THRESHOLDS.warning) return "text-yellow-500";
+  return "text-emerald-500";
 }
 
 interface HealthBadgeProps {
@@ -170,10 +252,8 @@ function HealthBadge({ healthy }: HealthBadgeProps) {
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        healthy
-          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          : "bg-red-500/10 text-red-600 dark:text-red-400",
+        "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+        healthy ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500",
       )}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", healthy ? "bg-emerald-500" : "bg-red-500")} />
@@ -190,28 +270,18 @@ interface ConnectionStatusProps {
 
 function ConnectionStatus({ label, connected, icon: Icon }: ConnectionStatusProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
+    <div className="flex items-center gap-2 rounded-lg border p-2">
       <div
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-lg",
+          "flex h-7 w-7 items-center justify-center rounded-md",
           connected ? "bg-emerald-500/10" : "bg-red-500/10",
         )}
       >
-        <Icon
-          className={cn(
-            "h-5 w-5",
-            connected ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
-          )}
-        />
+        <Icon className={cn("h-4 w-4", connected ? "text-emerald-500" : "text-red-500")} />
       </div>
-      <div>
-        <p className="text-sm font-medium">{label}</p>
-        <p
-          className={cn(
-            "text-xs",
-            connected ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
-          )}
-        >
+      <div className="min-w-0">
+        <p className="text-xs font-medium truncate">{label}</p>
+        <p className={cn("text-[10px]", connected ? "text-emerald-500" : "text-red-500")}>
           {connected ? "Conectado" : "Desconectado"}
         </p>
       </div>
@@ -219,85 +289,70 @@ function ConnectionStatus({ label, connected, icon: Icon }: ConnectionStatusProp
   );
 }
 
-interface ResourceBarProps {
+interface CompactResourceRowProps {
   icon: React.ElementType;
   label: string;
   value: number;
   detail: string;
+  compact?: boolean;
 }
 
-function ResourceBar({ icon: Icon, label, value, detail }: ResourceBarProps) {
-  const getBarColor = (percent: number) => {
-    if (percent >= 90) return "bg-red-500";
-    if (percent >= 70) return "bg-yellow-500";
-    return "bg-emerald-500";
-  };
-
-  const getTextColor = (percent: number) => {
-    if (percent >= 90) return "text-red-600 dark:text-red-400";
-    if (percent >= 70) return "text-yellow-600 dark:text-yellow-400";
-    return "text-emerald-600 dark:text-emerald-400";
-  };
-
+function CompactResourceRow({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  compact = false,
+}: CompactResourceRowProps) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">{label}</span>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5">
+          <Icon className={cn("h-3.5 w-3.5", getTextColor(value))} />
+          <span className={cn("font-medium", compact && "text-muted-foreground")}>{label}</span>
         </div>
-        <span className={cn("text-sm font-semibold", getTextColor(value))}>
+        <span className={cn("font-semibold tabular-nums", getTextColor(value))}>
           {value.toFixed(1)}%
         </span>
       </div>
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
         <div
           className={cn("h-full rounded-full transition-all duration-300", getBarColor(value))}
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
-      <p className="text-xs text-muted-foreground">{detail}</p>
+      <p className="text-[10px] text-muted-foreground">{detail}</p>
     </div>
   );
 }
 
-interface DiskBarProps {
-  disk: DiskInfo;
-}
-
-function DiskBar({ disk }: DiskBarProps) {
-  return (
-    <ResourceBar
-      icon={HardDrive}
-      label={`Disco (${disk.mount_point})`}
-      value={disk.usage_percent}
-      detail={`${formatBytes(disk.used_bytes)} / ${formatBytes(disk.total_bytes)} • ${formatBytes(disk.free_bytes)} livre`}
-    />
-  );
-}
-
-interface StatItemProps {
+interface StatItemCompactProps {
   icon: React.ElementType;
   label: string;
   value: string;
   variant?: "default" | "success" | "warning" | "error";
 }
 
-function StatItem({ icon: Icon, label, value, variant = "default" }: StatItemProps) {
+function StatItemCompact({ icon: Icon, label, value, variant = "default" }: StatItemCompactProps) {
+  const iconClasses = {
+    default: "text-muted-foreground",
+    success: "text-emerald-500",
+    warning: "text-yellow-500",
+    error: "text-red-500",
+  };
+
   const valueClasses = {
     default: "text-foreground",
-    success: "text-emerald-600 dark:text-emerald-400",
-    warning: "text-yellow-600 dark:text-yellow-400",
-    error: "text-red-600 dark:text-red-400",
+    success: "text-emerald-500",
+    warning: "text-yellow-500",
+    error: "text-red-500",
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Icon className="h-4 w-4 text-muted-foreground" />
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn("text-sm font-medium", valueClasses[variant])}>{value}</p>
-      </div>
+    <div className="text-center">
+      <Icon className={cn("h-3.5 w-3.5 mx-auto mb-0.5", iconClasses[variant])} />
+      <p className={cn("font-semibold tabular-nums", valueClasses[variant])}>{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -307,12 +362,8 @@ function formatUptime(seconds: number): string {
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
 
-  if (days > 0) {
-    return `${days}d ${hours}h`;
-  }
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 }
 
@@ -338,23 +389,23 @@ function SystemHealthSkeleton() {
           <CardTitle className="text-base font-semibold">Status do Sistema</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-16 rounded-lg" />
-          <Skeleton className="h-16 rounded-lg" />
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Skeleton className="h-12 rounded-lg" />
+          <Skeleton className="h-12 rounded-lg" />
         </div>
-        <div className="space-y-3 pt-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
+        <div className="space-y-2 pt-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
         </div>
-        <Skeleton className="h-8 w-full" />
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <Skeleton className="h-12" />
-          <Skeleton className="h-12" />
-          <Skeleton className="h-12" />
-          <Skeleton className="h-12" />
+        <Skeleton className="h-6 w-full" />
+        <div className="grid grid-cols-4 gap-2 pt-2">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
         </div>
       </CardContent>
     </Card>
