@@ -254,7 +254,7 @@ class Settings(BaseSettings):
         description="Maximum expiration for registration links (days)",
     )
     registration_link_base_url: str = Field(
-        default="https://farmaeasy.com.br/cadastrar",
+        default="https://treinamento.farmaeasy.com.br/cadastrar",
         description="Base URL for registration links",
     )
 
