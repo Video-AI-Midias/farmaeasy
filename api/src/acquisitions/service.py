@@ -282,16 +282,17 @@ class AcquisitionService:
         self,
         user_id: UUID,
         course_id: UUID,
-        granted_by: UUID,
+        granted_by: UUID | None = None,
         expires_in_days: int | None = None,
         notes: str | None = None,
     ) -> CourseAcquisition:
-        """Grant access to a course (admin action).
+        """Grant access to a course (admin or system action).
 
         Args:
             user_id: User to grant access to
             course_id: Course to grant access to
-            granted_by: Admin user ID
+            granted_by: Admin user ID, or None for system grants
+                       (e.g., registration links, promotional codes)
             expires_in_days: Days until access expires (None = permanent)
             notes: Optional admin notes
 
@@ -332,7 +333,7 @@ class AcquisitionService:
             "access_granted",
             user_id=str(user_id),
             course_id=str(course_id),
-            granted_by=str(granted_by),
+            granted_by=str(granted_by) if granted_by else "system",
             expires_in_days=expires_in_days,
         )
 

@@ -195,11 +195,23 @@ def create_free_acquisition(
 def create_admin_grant(
     user_id: UUID,
     course_id: UUID,
-    granted_by: UUID,
+    granted_by: UUID | None = None,
     expires_at: datetime | None = None,
     notes: str | None = None,
 ) -> CourseAcquisition:
-    """Create acquisition granted by admin."""
+    """Create acquisition granted by admin or system.
+
+    Args:
+        user_id: User receiving access
+        course_id: Course to grant access to
+        granted_by: Admin user ID who granted access, or None for system grants
+                   (e.g., registration links, promotional codes)
+        expires_at: Optional expiration datetime
+        notes: Optional notes about the grant
+
+    Returns:
+        CourseAcquisition with ADMIN_GRANT type
+    """
     return CourseAcquisition(
         user_id=user_id,
         course_id=course_id,
