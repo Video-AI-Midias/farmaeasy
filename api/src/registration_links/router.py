@@ -1,7 +1,7 @@
 """FastAPI router for registration links.
 
 Endpoints:
-- POST /v1/registration-links (API Key protected) - Create link
+- POST /v1/registration-links (API Key OR Teacher+) - Create link
 - GET /v1/registration-links (Teacher+) - List my links
 - DELETE /v1/registration-links/{id} (Teacher+) - Revoke link
 - POST /v1/register/{shortcode}/validate (Public) - Validate link
@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from src.auth.dependencies import (
-    MasterApiKey,
+    ApiKeyOrTeacher,
     TeacherUser,
 )
 from src.config.settings import get_settings
@@ -62,22 +62,31 @@ router = APIRouter(
     response_model=RegistrationLinkResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create registration link",
-    description="Create a new registration link for WhatsApp customers. Requires API Key.",
+    description="Create a new registration link for WhatsApp customers. "
+    "Accepts either API Key (X-API-Key header) or Teacher+ JWT token.",
 )
 async def create_registration_link(
     request: CreateRegistrationLinkRequest,
-    _api_key: MasterApiKey,
+    auth: ApiKeyOrTeacher,
     service: RegistrationLinkServiceDep,
 ) -> RegistrationLinkResponse:
     """Create a new registration link.
 
-    Requires API Key authentication (X-API-Key header).
+    Accepts two authentication methods:
+    - API Key: X-API-Key header (for integrations)
+    - JWT Token: Authorization: Bearer <token> (for admin panel)
+
+    When using JWT, the user ID is tracked as created_by for audit trail.
     """
     settings = get_settings()
+
+    # Get created_by from auth (None for API Key, user.id for JWT)
+    created_by = UUID(auth.created_by_id) if auth.created_by_id else None
 
     try:
         link, token = await service.create_link(
             course_ids=request.course_ids,
+            created_by=created_by,
             expires_in_days=request.expires_in_days,
             prefill_phone=request.prefill_phone,
             notes=request.notes,

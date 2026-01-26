@@ -318,3 +318,113 @@ async def verify_master_api_key(
 
 # Master API Key dependency
 MasterApiKey = Annotated[str, Depends(verify_master_api_key)]
+
+
+# ==============================================================================
+# Hybrid Authentication (API Key OR JWT)
+# ==============================================================================
+
+
+class ApiKeyOrTeacherAuth:
+    """Result of hybrid authentication (API Key OR Teacher+ JWT).
+
+    Attributes:
+        user: UserResponse if authenticated via JWT, None if via API Key
+        is_api_key: True if authenticated via API Key
+    """
+
+    def __init__(self, user: UserResponse | None = None, is_api_key: bool = False):
+        self.user = user
+        self.is_api_key = is_api_key
+
+    @property
+    def created_by_id(self) -> str | None:
+        """Get the user ID for audit trail, or None for API Key auth."""
+        return str(self.user.id) if self.user else None
+
+
+async def verify_api_key_or_teacher(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    token: Annotated[str | None, Depends(get_token_from_header)],
+) -> ApiKeyOrTeacherAuth:
+    """Verify either API Key header OR Teacher+ JWT token.
+
+    Tries JWT first (if present), falls back to API Key.
+    This allows both admin panel users and external integrations
+    to use the same endpoint.
+
+    Args:
+        request: FastAPI request
+        settings: Application settings
+        token: JWT token from Authorization header (optional)
+
+    Returns:
+        ApiKeyOrTeacherAuth with user info or API Key flag
+
+    Raises:
+        HTTPException(401): If neither authentication method is valid
+        HTTPException(403): If JWT user doesn't have Teacher+ role
+    """
+    # Try JWT authentication first (if token present)
+    if token:
+        try:
+            payload = decode_access_token(token)
+            user_id = payload["sub"]
+            user_role = payload["role"]
+
+            # Check if user has Teacher+ permission
+            if not has_permission(user_role, UserRole.TEACHER):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Permissao insuficiente. Requer nivel Teacher ou superior.",
+                )
+
+            # Set user_id in context for logging
+            set_user_id(user_id)
+
+            user = UserResponse(
+                id=user_id,
+                email=payload["email"],
+                role=user_role,
+                name="",
+                phone="",
+                is_active=True,
+                created_at=payload.get("iat"),
+            )
+
+            return ApiKeyOrTeacherAuth(user=user, is_api_key=False)
+
+        except JWTError:
+            # Invalid token - fall through to try API Key
+            pass
+
+    # Try API Key authentication
+    api_key = request.headers.get("X-API-Key")
+
+    if api_key:
+        if not settings.master_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="API Key authentication not configured",
+            )
+
+        if secrets.compare_digest(api_key, settings.master_api_key):
+            return ApiKeyOrTeacherAuth(user=None, is_api_key=True)
+
+        # Invalid API Key
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API Key",
+        )
+
+    # Neither authentication method provided
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required. Provide Bearer token or X-API-Key header.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+# Hybrid auth dependency
+ApiKeyOrTeacher = Annotated[ApiKeyOrTeacherAuth, Depends(verify_api_key_or_teacher)]
