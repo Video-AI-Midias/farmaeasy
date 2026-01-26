@@ -610,21 +610,28 @@ class RegistrationLinkListResponse(BaseModel):
 class CompleteRegistrationResponse(BaseModel):
     """Response after completing registration.
 
-    Supports both full success and partial success scenarios:
-    - Full success: success=True, partial_success=False, failed_courses=[]
+    Supports multiple scenarios:
+    - New user success: success=True, existing_user=False, partial_success=False
+    - Existing user: success=True, existing_user=True (course access granted)
     - Partial success: success=True, partial_success=True, failed_courses=[...]
 
     In partial success, the user is created and can login, but some courses
     failed to grant. The user should contact support.
     """
 
-    success: bool = Field(description="Whether user was created successfully")
+    success: bool = Field(description="Whether operation completed successfully")
     user_id: UUID
     email: str
     name: str
     courses_granted: list[CoursePreview]
     access_token: str = Field(description="JWT access token for immediate login")
     message: str = "Registration completed successfully"
+
+    # Existing user scenario
+    existing_user: bool = Field(
+        default=False,
+        description="True if user already existed and course access was granted",
+    )
 
     # Partial success fields
     partial_success: bool = Field(
