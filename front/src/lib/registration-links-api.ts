@@ -1,11 +1,16 @@
 /**
  * API client for registration links management (Admin/Teacher).
+ *
+ * Uses the authenticated API client to automatically include JWT tokens.
+ * Teachers and Admins can create/manage links directly from the admin panel.
  */
+import api from "@/lib/api";
 import type {
   CompleteRegistrationResponse,
   CoursePreview,
   ValidateLinkResponse,
 } from "@/types/registration-link";
+import type { AxiosError } from "axios";
 
 // ==============================================================================
 // Types
@@ -58,63 +63,62 @@ export interface ListLinksResponse {
 }
 
 // ==============================================================================
-// API Functions
+// Helper Functions
 // ==============================================================================
 
-const API_BASE = "/api/v1/registration-links";
+/**
+ * Extract error message from Axios error response.
+ */
+function getErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ detail?: string; message?: string }>;
+  return axiosError.response?.data?.detail || axiosError.response?.data?.message || fallback;
+}
+
+// ==============================================================================
+// API Functions (Authenticated - uses JWT token automatically)
+// ==============================================================================
+
+const API_BASE = "/registration-links";
 
 /**
  * Create a new registration link.
+ *
+ * Requires Teacher+ role. The JWT token is automatically included
+ * via the api client interceptor.
  */
 export async function createLink(data: CreateLinkRequest): Promise<CreateLinkResponse> {
-  const response = await fetch(API_BASE, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Erro ao criar link" }));
-    throw new Error(error.detail || error.message || "Erro ao criar link");
+  try {
+    const response = await api.post<CreateLinkResponse>(API_BASE, data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Erro ao criar link"));
   }
-
-  return response.json();
 }
 
 /**
  * List registration links created by the current user.
+ *
+ * Teachers see only their own links, admins see all.
  */
 export async function listLinks(params?: ListLinksParams): Promise<ListLinksResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.status) searchParams.set("status", params.status);
-  if (params?.limit) searchParams.set("limit", params.limit.toString());
-  if (params?.offset) searchParams.set("offset", params.offset.toString());
-
-  const url = `${API_BASE}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Erro ao listar links" }));
-    throw new Error(error.detail || error.message || "Erro ao listar links");
+  try {
+    const response = await api.get<ListLinksResponse>(API_BASE, { params });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Erro ao listar links"));
   }
-
-  return response.json();
 }
 
 /**
  * Revoke a registration link.
+ *
+ * Teachers can only revoke their own links.
  */
 export async function revokeLink(linkId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/${linkId}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Erro ao revogar link" }));
-    throw new Error(error.detail || error.message || "Erro ao revogar link");
+  try {
+    await api.delete(`${API_BASE}/${linkId}`);
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Erro ao revogar link"));
   }
 }
 
