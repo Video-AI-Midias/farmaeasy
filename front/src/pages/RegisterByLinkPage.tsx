@@ -55,6 +55,7 @@ export function RegisterByLinkPage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<CompleteRegistrationResponse | null>(null);
+  const [isDuplicateError, setIsDuplicateError] = useState(false);
 
   // Validate the link on mount
   useEffect(() => {
@@ -159,6 +160,7 @@ export function RegisterByLinkPage() {
 
       setIsSubmitting(true);
       setErrorMessage("");
+      setIsDuplicateError(false);
 
       try {
         const requestBody: CompleteRegistrationRequest = {
@@ -217,6 +219,10 @@ export function RegisterByLinkPage() {
 
         if (!response.ok) {
           const errorData = data as unknown as { detail?: string; message?: string };
+          // Check if it's a duplicate user error (409 Conflict)
+          if (response.status === 409) {
+            setIsDuplicateError(true);
+          }
           throw new Error(errorData.detail || errorData.message || "Erro ao completar cadastro.");
         }
 
@@ -276,9 +282,31 @@ export function RegisterByLinkPage() {
     );
   }
 
-  // Success state (full or partial)
+  // Success state (full or partial, new or existing user)
   if (pageState === "success" && successData) {
     const isPartialSuccess = successData.partial_success === true;
+    const isExistingUser = successData.existing_user === true;
+
+    // Determine title and description based on scenario
+    let title: string;
+    let description: string;
+
+    if (isPartialSuccess) {
+      title = isExistingUser
+        ? "Cursos liberados com pendências"
+        : "Cadastro realizado com pendências";
+      description = `Olá, ${successData.name}! ${
+        isExistingUser
+          ? "Identificamos sua conta e liberamos novos cursos, mas há pendências."
+          : "Seu cadastro foi realizado, mas há pendências."
+      }`;
+    } else if (isExistingUser) {
+      title = "Novos cursos liberados!";
+      description = `Olá, ${successData.name}! Identificamos que você já possui uma conta. Seu acesso aos novos cursos foi liberado.`;
+    } else {
+      title = "Cadastro concluído!";
+      description = `Bem-vindo(a), ${successData.name}! Seu acesso foi liberado.`;
+    }
 
     return (
       <PageContainer>
@@ -295,14 +323,8 @@ export function RegisterByLinkPage() {
                 <CheckCircle2 className="h-8 w-8 text-primary" />
               )}
             </div>
-            <CardTitle className="text-2xl">
-              {isPartialSuccess ? "Cadastro realizado com pendências" : "Cadastro concluído!"}
-            </CardTitle>
-            <CardDescription>
-              {isPartialSuccess
-                ? `Bem-vindo(a), ${successData.name}! Seu cadastro foi realizado, mas há pendências.`
-                : `Bem-vindo(a), ${successData.name}! Seu acesso foi liberado.`}
-            </CardDescription>
+            <CardTitle className="text-2xl">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Warning for partial success */}
@@ -398,10 +420,17 @@ export function RegisterByLinkPage() {
         </CardHeader>
         <CardContent>
           {errorMessage && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant={isDuplicateError ? "default" : "destructive"} className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Erro</AlertTitle>
-              <AlertDescription>{errorMessage}</AlertDescription>
+              <AlertTitle>{isDuplicateError ? "Conta já existe" : "Erro"}</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>{errorMessage}</p>
+                {isDuplicateError && (
+                  <Button asChild size="sm" className="w-full">
+                    <Link to="/entrar">Fazer login na conta existente</Link>
+                  </Button>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 

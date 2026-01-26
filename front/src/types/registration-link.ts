@@ -60,6 +60,8 @@ export interface CompleteRegistrationResponse {
   courses_granted: CoursePreview[];
   access_token: string;
   message: string;
+  /** True if user already existed and course access was granted (not a new registration) */
+  existing_user?: boolean;
   /** True if registration succeeded but some courses failed to grant */
   partial_success?: boolean;
   /** Course IDs that failed to grant (if partial_success=true) */
