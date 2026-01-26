@@ -71,15 +71,19 @@ class LinkRevokedError(Exception):
 
 
 class DuplicateUserError(Exception):
-    """Raised when user data conflicts with existing user.
+    """Raised when user data conflicts with existing user (different user).
+
+    This is raised when email belongs to one user and CPF belongs to another,
+    or when only one field matches but the other doesn't.
 
     Note: For security, the public message should be generic to prevent
     user enumeration. The field is stored for internal logging only.
     """
 
-    # Generic message to prevent user enumeration
+    # Generic message to prevent user enumeration (in Portuguese)
     GENERIC_MESSAGE = (
-        "Registration failed. Please check your information and try again."
+        "Os dados informados estão em conflito com uma conta existente. "
+        "Se você já possui uma conta, faça login com seu e-mail cadastrado."
     )
 
     def __init__(self, internal_message: str, field: str | None = None):
@@ -98,6 +102,18 @@ class DuplicateUserError(Exception):
     def field(self) -> str | None:
         """Get field that caused conflict for logging."""
         return self._field
+
+
+class ExistingUserFoundError(Exception):
+    """Raised when user already exists and can receive course access.
+
+    This is NOT an error - it signals that instead of creating a new user,
+    we should grant course access to the existing user.
+    """
+
+    def __init__(self, user: User):
+        self.user = user
+        super().__init__(f"User {user.id} already exists")
 
 
 class CourseGrantError(Exception):
@@ -119,6 +135,24 @@ class CourseGrantError(Exception):
         self.granted_courses = granted_courses or []
 
 
+class InvalidCourseError(Exception):
+    """Raised when one or more course IDs are invalid.
+
+    Attributes:
+        invalid_ids: List of course IDs that were not found
+    """
+
+    # Maximum number of course IDs to display in error message
+    MAX_DISPLAY_IDS = 3
+
+    def __init__(self, invalid_ids: list[UUID]):
+        self.invalid_ids = invalid_ids
+        ids_str = ", ".join(str(cid) for cid in invalid_ids[: self.MAX_DISPLAY_IDS])
+        if len(invalid_ids) > self.MAX_DISPLAY_IDS:
+            ids_str += f" (and {len(invalid_ids) - self.MAX_DISPLAY_IDS} more)"
+        super().__init__(f"Invalid course IDs: {ids_str}")
+
+
 class RegistrationLinkService:
     """Service for registration link management."""
 
@@ -129,6 +163,7 @@ class RegistrationLinkService:
         redis: "Redis | None" = None,
         auth_service=None,
         acquisition_service=None,
+        course_service=None,
     ):
         """Initialize with Cassandra session and optional dependencies.
 
@@ -138,12 +173,14 @@ class RegistrationLinkService:
             redis: Optional Redis for rate limiting
             auth_service: AuthService for user creation
             acquisition_service: AcquisitionService for granting course access
+            course_service: CourseService for course validation and info retrieval
         """
         self.session = session
         self.keyspace = keyspace
         self.redis = redis
         self.auth_service = auth_service
         self.acquisition_service = acquisition_service
+        self.course_service = course_service
         self._prepare_statements()
 
     def _prepare_statements(self) -> None:
@@ -196,10 +233,10 @@ class RegistrationLinkService:
             WHERE shortcode = ?
         """)
 
-        # Mark link as used (main table)
+        # Update link with user metadata (status already changed by atomic reservation)
         self._mark_used = self.session.prepare(f"""
             UPDATE {self.keyspace}.registration_links
-            SET status = ?, user_id = ?, used_at = ?, ip_address = ?, user_agent = ?
+            SET user_id = ?, used_at = ?, ip_address = ?, user_agent = ?
             WHERE id = ?
         """)
 
@@ -213,6 +250,15 @@ class RegistrationLinkService:
         self._check_shortcode = self.session.prepare(f"""
             SELECT shortcode FROM {self.keyspace}.registration_links_by_shortcode
             WHERE shortcode = ?
+        """)
+
+        # Atomic link reservation using LWT (Lightweight Transaction)
+        # This uses IF clause to ensure atomic compare-and-swap
+        self._reserve_link_atomic = self.session.prepare(f"""
+            UPDATE {self.keyspace}.registration_links
+            SET status = ?
+            WHERE id = ?
+            IF status = ?
         """)
 
     # ==========================================================================
@@ -243,9 +289,13 @@ class RegistrationLinkService:
 
         Raises:
             ValueError: If course_ids is empty
+            InvalidCourseError: If any course_id does not exist
         """
         if not course_ids:
             raise ValueError("At least one course ID is required")
+
+        # Validate that all courses exist
+        await self._validate_course_ids(course_ids)
 
         # Generate unique shortcode
         shortcode = await self._generate_unique_shortcode()
@@ -282,6 +332,39 @@ class RegistrationLinkService:
         )
 
         return link, token
+
+    async def _validate_course_ids(self, course_ids: list[UUID]) -> None:
+        """Validate that all course IDs exist.
+
+        Args:
+            course_ids: List of course IDs to validate
+
+        Raises:
+            InvalidCourseError: If any course ID does not exist
+        """
+        if not self.course_service:
+            # If CourseService is not configured, skip validation
+            # This allows backward compatibility in development/testing
+            logger.warning(
+                "course_validation_skipped",
+                reason="CourseService not configured",
+                course_count=len(course_ids),
+            )
+            return
+
+        invalid_ids: list[UUID] = []
+        for course_id in course_ids:
+            course = await self.course_service.get_course(course_id)
+            if not course:
+                invalid_ids.append(course_id)
+
+        if invalid_ids:
+            logger.warning(
+                "invalid_course_ids_detected",
+                invalid_count=len(invalid_ids),
+                invalid_ids=[str(cid) for cid in invalid_ids],
+            )
+            raise InvalidCourseError(invalid_ids)
 
     async def _generate_unique_shortcode(self, max_attempts: int = 10) -> str:
         """Generate a unique shortcode.
@@ -440,17 +523,27 @@ class RegistrationLinkService:
             course_ids: Set of course IDs
 
         Returns:
-            List of CoursePreview objects
+            List of CoursePreview objects with titles from CourseService
         """
-        # If no course service, return empty previews with IDs only
         courses = []
         for course_id in course_ids:
-            # Try to get from course service if available
-            title = "Course"  # Default
+            title = "Curso"  # Default fallback
             thumbnail_url = None
 
-            # Here we would normally query the course service
-            # For now, return minimal info
+            # Query CourseService if available
+            if self.course_service:
+                try:
+                    course = await self.course_service.get_course(course_id)
+                    if course:
+                        title = course.title
+                        thumbnail_url = getattr(course, "thumbnail_url", None)
+                except Exception as e:
+                    logger.warning(
+                        "course_preview_fetch_failed",
+                        course_id=str(course_id),
+                        error=str(e),
+                    )
+
             courses.append(
                 CoursePreview(
                     id=course_id,
@@ -471,7 +564,7 @@ class RegistrationLinkService:
         request: CompleteRegistrationRequest,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> tuple[User, list[CoursePreview], str]:
+    ) -> tuple[User, list[CoursePreview], str, bool]:
         """Complete registration using a link.
 
         Args:
@@ -481,7 +574,7 @@ class RegistrationLinkService:
             user_agent: Client user agent
 
         Returns:
-            Tuple of (created User, granted courses, access_token)
+            Tuple of (User, granted courses, access_token, is_existing_user)
 
         Raises:
             LinkNotFoundError: If link doesn't exist
@@ -489,7 +582,7 @@ class RegistrationLinkService:
             LinkAlreadyUsedError: If link was already used
             LinkRevokedError: If link was revoked
             ValueError: If token is invalid
-            DuplicateUserError: If email/CPF/CNPJ already exists
+            DuplicateUserError: If email/CPF/CNPJ conflict (different users)
         """
         if not self.auth_service:
             msg = "AuthService not configured"
@@ -502,18 +595,43 @@ class RegistrationLinkService:
         if request.password != request.confirm_password:
             raise ValueError("Passwords do not match")
 
-        # Check for existing users
-        await self._check_user_uniqueness(
-            email=request.email,
-            cpf=request.cpf,
-            _cnpj=request.cnpj,
+        # CRITICAL: Atomically reserve the link BEFORE any user operations
+        # This uses Cassandra LWT to prevent race conditions where multiple
+        # concurrent requests could use the same link
+        reserved = await self._reserve_link_atomically(
+            link_id=link.id,
+            shortcode=link.shortcode,
         )
+        if not reserved:
+            # Link was already used by another concurrent request
+            raise LinkAlreadyUsedError
 
-        # Create user
-        user = await self._create_user(request, link.id)
+        # Check for existing users - may raise ExistingUserFoundError
+        is_existing_user = False
+        user: User | None = None
 
-        # CRITICAL: Mark link as used IMMEDIATELY after user creation
-        # This must happen before course grant to prevent link reuse on partial failure
+        try:
+            await self._check_user_uniqueness(
+                email=request.email,
+                cpf=request.cpf,
+                _cnpj=request.cnpj,
+            )
+            # No existing user - create new one
+            user = await self._create_user(request, link.id)
+
+        except ExistingUserFoundError as e:
+            # Same user found by email AND cpf - grant course access to existing user
+            user = e.user
+            is_existing_user = True
+            logger.info(
+                "existing_user_course_grant",
+                link_id=str(link.id),
+                shortcode=shortcode,
+                user_id=str(user.id),
+                email=user.email,
+            )
+
+        # Update link with user metadata (status already changed by atomic reservation)
         await self._mark_link_used(
             link_id=link.id,
             shortcode=link.shortcode,
@@ -534,16 +652,22 @@ class RegistrationLinkService:
                 course_ids=link.course_ids,
             )
 
+            log_event = (
+                "existing_user_courses_granted"
+                if is_existing_user
+                else "registration_completed"
+            )
             logger.info(
-                "registration_completed",
+                log_event,
                 link_id=str(link.id),
                 shortcode=shortcode,
                 user_id=str(user.id),
                 email=user.email,
                 courses_granted=len(courses_granted),
+                is_existing_user=is_existing_user,
             )
 
-            return user, courses_granted, access_token
+            return user, courses_granted, access_token, is_existing_user
 
         except CourseGrantError as e:
             # Log the partial failure
@@ -556,10 +680,12 @@ class RegistrationLinkService:
                 failed_courses=len(e.failed_courses),
                 granted_courses=len(e.granted_courses),
                 error=str(e),
+                is_existing_user=is_existing_user,
             )
             # Re-raise with access_token attached for router to use
             e.access_token = access_token  # type: ignore[attr-defined]
             e.user = user  # type: ignore[attr-defined]
+            e.is_existing_user = is_existing_user  # type: ignore[attr-defined]
             raise
 
     async def _check_user_uniqueness(
@@ -567,7 +693,7 @@ class RegistrationLinkService:
         email: str,
         cpf: str,
         _cnpj: str,  # Reserved for future duplicate check
-    ) -> None:
+    ) -> User | None:
         """Check if user data conflicts with existing users.
 
         Security note: This method raises a generic error message to prevent
@@ -578,33 +704,69 @@ class RegistrationLinkService:
             cpf: User CPF
             _cnpj: User CNPJ (reserved for future validation)
 
+        Returns:
+            User if same user exists (email AND cpf match), None if new user
+
         Raises:
-            DuplicateUserError: If any field conflicts (with generic message)
+            DuplicateUserError: If email and cpf belong to DIFFERENT users
+            ExistingUserFoundError: If same user found (email AND cpf match)
         """
-        # Check email - log internally, raise generic error
-        if await self.auth_service.get_user_by_email(email):
-            logger.warning(
-                "duplicate_user_attempt",
-                field="email",
-                # Don't log actual email to avoid PII in logs
+        user_by_email = await self.auth_service.get_user_by_email(email)
+        user_by_cpf = await self.auth_service.get_user_by_cpf(cpf)
+
+        # Case 1: Neither exists - new user, proceed with registration
+        if not user_by_email and not user_by_cpf:
+            return None
+
+        # Case 2: Same user found by both email AND cpf
+        if user_by_email and user_by_cpf and user_by_email.id == user_by_cpf.id:
+            logger.info(
+                "existing_user_found",
+                user_id=str(user_by_email.id),
                 email_domain=email.split("@")[-1] if "@" in email else "invalid",
             )
-            raise DuplicateUserError("Email already registered", "email")
+            raise ExistingUserFoundError(user_by_email)
 
-        # Check CPF - log internally, raise generic error
-        if await self.auth_service.get_user_by_cpf(cpf):
+        # Case 3: Email exists but CPF doesn't - conflict (different user scenario)
+        if user_by_email and not user_by_cpf:
             logger.warning(
-                "duplicate_user_attempt",
-                field="cpf",
-                # Don't log full CPF - only last 4 digits
+                "duplicate_user_conflict",
+                conflict_type="email_only",
+                email_domain=email.split("@")[-1] if "@" in email else "invalid",
+            )
+            raise DuplicateUserError(
+                "Email registered with different CPF",
+                "email_cpf_mismatch",
+            )
+
+        # Case 4: CPF exists but email doesn't - conflict (different user scenario)
+        if user_by_cpf and not user_by_email:
+            logger.warning(
+                "duplicate_user_conflict",
+                conflict_type="cpf_only",
                 cpf_suffix=cpf[-CPF_SUFFIX_DISPLAY_LENGTH:]
                 if len(cpf) >= CPF_SUFFIX_DISPLAY_LENGTH
                 else "****",
             )
-            raise DuplicateUserError("CPF already registered", "cpf")
+            raise DuplicateUserError(
+                "CPF registered with different email",
+                "cpf_email_mismatch",
+            )
 
-        # Check CNPJ (need to add this method to auth service or check here)
-        # For now, we'll skip CNPJ uniqueness check as it may be shared
+        # Case 5: Both exist but are DIFFERENT users - conflict
+        if user_by_email and user_by_cpf and user_by_email.id != user_by_cpf.id:
+            logger.warning(
+                "duplicate_user_conflict",
+                conflict_type="different_users",
+                email_user_id=str(user_by_email.id),
+                cpf_user_id=str(user_by_cpf.id),
+            )
+            raise DuplicateUserError(
+                "Email and CPF belong to different users",
+                "different_users",
+            )
+
+        return None  # Should never reach here, but satisfy type checker
 
     async def _create_user(
         self,
@@ -647,6 +809,29 @@ class RegistrationLinkService:
             registration_link_id=registration_link_id,
         )
 
+    async def _get_course_title(self, course_id: UUID) -> str:
+        """Get course title by ID.
+
+        Args:
+            course_id: Course ID to get title for
+
+        Returns:
+            Course title, or "Curso" as fallback if not found
+        """
+        if not self.course_service:
+            return "Curso"
+
+        try:
+            course = await self.course_service.get_course(course_id)
+            return course.title if course else "Curso"
+        except Exception as e:
+            logger.warning(
+                "course_title_fetch_failed",
+                course_id=str(course_id),
+                error=str(e),
+            )
+            return "Curso"
+
     async def _grant_course_access(
         self,
         user_id: UUID,
@@ -674,19 +859,24 @@ class RegistrationLinkService:
                     await self.acquisition_service.grant_access(
                         user_id=user_id,
                         course_id=course_id,
-                        granted_by=None,  # System grant
+                        granted_by=None,  # System grant via registration link
                         notes="Granted via registration link",
                     )
+
+                    # Get course title for user-friendly response
+                    course_title = await self._get_course_title(course_id)
+
                     granted_courses.append(
                         CoursePreview(
                             id=course_id,
-                            title="Course",  # Would get from course service
+                            title=course_title,
                         )
                     )
                     logger.info(
                         "course_access_granted",
                         user_id=str(user_id),
                         course_id=str(course_id),
+                        course_title=course_title,
                     )
                 except (ValueError, RuntimeError, KeyError) as e:
                     # Specific expected exceptions from acquisition service
@@ -732,11 +922,102 @@ class RegistrationLinkService:
                 course_count=len(course_ids),
                 note="Acquisition service not configured - courses not actually granted",
             )
-            granted_courses = [
-                CoursePreview(id=cid, title="Course (pending)") for cid in course_ids
-            ]
+            # Still try to get course titles for better UX
+            for cid in course_ids:
+                title = await self._get_course_title(cid)
+                granted_courses.append(
+                    CoursePreview(id=cid, title=f"{title} (pendente)")
+                )
 
         return granted_courses
+
+    async def _reserve_link_atomically(
+        self,
+        link_id: UUID,
+        shortcode: str,
+    ) -> bool:
+        """Atomically reserve a link for use using LWT.
+
+        Uses Cassandra's Lightweight Transaction (LWT) to atomically
+        change status from PENDING to USED, preventing race conditions
+        where multiple concurrent requests could use the same link.
+
+        Args:
+            link_id: Link ID to reserve
+            shortcode: Link shortcode (for lookup table update)
+
+        Returns:
+            True if reservation succeeded, False if link was already used
+
+        Raises:
+            DatabaseError: If database operation fails
+        """
+        try:
+            # Atomic compare-and-swap: set status to USED only if currently PENDING
+            result = await self.session.aexecute(
+                self._reserve_link_atomic,
+                [
+                    LinkStatus.USED.value,  # new status
+                    link_id,  # WHERE id = ?
+                    LinkStatus.PENDING.value,  # IF status = ?
+                ],
+            )
+
+            # LWT returns [applied] column - True if update was applied
+            row = result[0] if result else None
+            was_applied = row and getattr(row, "[applied]", False)
+
+            if was_applied:
+                # Update lookup table (best effort - main table is source of truth)
+                try:
+                    await self.session.aexecute(
+                        self._update_lookup_status,
+                        [LinkStatus.USED.value, shortcode],
+                    )
+                except Exception as e:
+                    # Log but don't fail - main table update succeeded
+                    logger.warning(
+                        "lookup_table_update_failed",
+                        link_id=str(link_id),
+                        shortcode=shortcode,
+                        error=str(e),
+                    )
+
+                logger.info(
+                    "link_reserved_atomically",
+                    link_id=str(link_id),
+                    shortcode=shortcode,
+                )
+                return True
+
+            # Link was not in PENDING status - someone else got it first
+            # Determine the actual current status for better debugging
+            if row is None:
+                current_status = "database_returned_empty"
+            else:
+                current_status = getattr(row, "status", "status_field_missing")
+
+            logger.warning(
+                "link_reservation_failed_not_pending",
+                link_id=str(link_id),
+                shortcode=shortcode,
+                current_status=current_status,
+                row_returned=row is not None,
+            )
+            return False
+
+        except Exception as e:
+            logger.exception(
+                "database_error_reserve_link",
+                link_id=str(link_id),
+                shortcode=shortcode,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise DatabaseError(
+                "Erro ao processar link de cadastro. Por favor, tente novamente.",
+                original_error=e,
+            ) from e
 
     async def _mark_link_used(
         self,
@@ -746,11 +1027,14 @@ class RegistrationLinkService:
         ip_address: str | None,
         user_agent: str | None,
     ) -> None:
-        """Mark a link as used.
+        """Update link with user metadata after atomic reservation.
+
+        Note: The link status was already changed to USED by _reserve_link_atomically().
+        This method only updates the additional metadata (user_id, used_at, ip, user_agent).
 
         Args:
             link_id: Link ID
-            shortcode: Link shortcode
+            shortcode: Link shortcode (for logging)
             user_id: User who used the link
             ip_address: Client IP
             user_agent: Client user agent
@@ -761,11 +1045,11 @@ class RegistrationLinkService:
         now = datetime.now(UTC)
 
         try:
-            # Update main table
+            # Update main table with user metadata
+            # Note: status was already changed by _reserve_link_atomically()
             await self.session.aexecute(
                 self._mark_used,
                 [
-                    LinkStatus.USED.value,
                     user_id,
                     now,
                     ip_address,
@@ -774,10 +1058,11 @@ class RegistrationLinkService:
                 ],
             )
 
-            # Update lookup table
-            await self.session.aexecute(
-                self._update_lookup_status,
-                [LinkStatus.USED.value, shortcode],
+            logger.info(
+                "link_metadata_updated",
+                link_id=str(link_id),
+                shortcode=shortcode,
+                user_id=str(user_id),
             )
         except Exception as e:
             logger.exception(

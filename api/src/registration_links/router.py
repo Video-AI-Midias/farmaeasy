@@ -39,6 +39,7 @@ from .service import (
     CourseGrantError,
     DatabaseError,
     DuplicateUserError,
+    InvalidCourseError,
     LinkAlreadyUsedError,
     LinkExpiredError,
     LinkNotFoundError,
@@ -74,13 +75,19 @@ async def create_registration_link(
     """
     settings = get_settings()
 
-    link, token = await service.create_link(
-        course_ids=request.course_ids,
-        expires_in_days=request.expires_in_days,
-        prefill_phone=request.prefill_phone,
-        notes=request.notes,
-        source=request.source,
-    )
+    try:
+        link, token = await service.create_link(
+            course_ids=request.course_ids,
+            expires_in_days=request.expires_in_days,
+            prefill_phone=request.prefill_phone,
+            notes=request.notes,
+            source=request.source,
+        )
+    except InvalidCourseError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"One or more course IDs are invalid: {e}",
+        ) from None
 
     return RegistrationLinkResponse.from_link(
         link,
@@ -291,7 +298,7 @@ async def validate_registration_link(
     summary="Complete registration",
     description="Complete registration using a valid link.",
 )
-async def complete_registration(
+async def complete_registration(  # noqa: PLR0912 - Many distinct exception handlers
     shortcode: str,
     request: CompleteRegistrationRequest,
     _http_request: Request,  # Reserved for future audit logging
@@ -303,7 +310,7 @@ async def complete_registration(
 
     This endpoint:
     1. Validates the link
-    2. Creates the user account
+    2. Creates the user account (or uses existing user if email+CPF match)
     3. Grants access to the courses
     4. Returns an access token for immediate login
     """
@@ -311,12 +318,26 @@ async def complete_registration(
     ip_address = client_info.ip_address
 
     try:
-        user, courses, access_token = await service.complete_registration(
+        (
+            user,
+            courses,
+            access_token,
+            is_existing_user,
+        ) = await service.complete_registration(
             shortcode=shortcode,
             request=request,
             ip_address=ip_address,
             user_agent=user_agent,
         )
+
+        # Build appropriate message
+        if is_existing_user:
+            message = (
+                "Identificamos que você já possui uma conta! "
+                "Seu acesso aos novos cursos foi liberado."
+            )
+        else:
+            message = "Cadastro realizado com sucesso!"
 
         return CompleteRegistrationResponse(
             success=True,
@@ -325,6 +346,8 @@ async def complete_registration(
             name=user.name,
             courses_granted=courses,
             access_token=access_token,
+            message=message,
+            existing_user=is_existing_user,
         )
 
     except LinkNotFoundError:
@@ -363,6 +386,7 @@ async def complete_registration(
         # Return 207 Multi-Status with access_token so user can login
         user = getattr(e, "user", None)
         access_token = getattr(e, "access_token", None)
+        is_existing_user = getattr(e, "is_existing_user", False)
 
         if not user or not access_token:
             # This shouldn't happen, but if it does, return 500
@@ -376,18 +400,28 @@ async def complete_registration(
             CoursePreview(id=cid, title="Course") for cid in e.granted_courses
         ]
 
+        # Build appropriate message
+        if is_existing_user:
+            message = (
+                "Identificamos que você já possui uma conta. "
+                "Alguns cursos foram liberados, mas houve problemas com outros."
+            )
+        else:
+            message = "Cadastro realizado, mas alguns cursos não foram liberados."
+
         return CompleteRegistrationResponse(
-            success=True,  # User was created successfully
+            success=True,  # User was created/found successfully
             user_id=user.id,
             email=user.email,
             name=user.name,
             courses_granted=granted_courses,
             access_token=access_token,
-            message="Cadastro realizado, mas alguns cursos não foram liberados.",
+            message=message,
+            existing_user=is_existing_user,
             partial_success=True,
             failed_courses=e.failed_courses,
             warning=(
-                "Seu cadastro foi concluído, mas não conseguimos liberar "
+                "Não conseguimos liberar "
                 f"{len(e.failed_courses)} curso(s). Por favor, entre em contato "
                 "com o suporte para resolver esta pendência."
             ),

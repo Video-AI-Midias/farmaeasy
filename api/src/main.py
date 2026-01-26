@@ -260,6 +260,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             redis=redis_client,
             auth_service=app_state.auth_service,
             acquisition_service=acquisition_service,
+            course_service=app_state.course_service,
         )
         app.state.registration_link_service = app_state.registration_link_service
         logger.info("registration_link_service_initialized")
