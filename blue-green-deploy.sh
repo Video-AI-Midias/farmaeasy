@@ -44,7 +44,10 @@ GREEN_PROFILE=${GREEN_PROFILE:-"green"}
 SERVICE_BASE=${SERVICE_BASE:-"farmaeasy-api-prod"}
 
 # Nginx configuration for zero-downtime deploy
+# IMPORTANT: The upstream is defined in a SEPARATE file (farmaeasy-upstream.conf)
+# The main site config (api.farmaeasy.com.br) just references the upstream
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-"/etc/nginx/sites-available/api.farmaeasy.com.br"}
+NGINX_UPSTREAM_PATH=${NGINX_UPSTREAM_PATH:-"/etc/nginx/conf.d/farmaeasy-upstream.conf"}
 NGINX_ENABLED_PATH=${NGINX_ENABLED_PATH:-"/etc/nginx/sites-enabled/api.farmaeasy.com.br"}
 ENABLE_NGINX_UPDATE=${ENABLE_NGINX_UPDATE:-"true"}
 
@@ -128,7 +131,6 @@ update_nginx_upstream() {
     local target_profile=$1
     local api_port backup_port
 
-    # Determina portas baseado no profile alvo
     case "$target_profile" in
     blue)
         api_port=$BLUE_PORT
@@ -144,62 +146,59 @@ update_nginx_upstream() {
         ;;
     esac
 
-    # Verifica se update está habilitado
     if [[ "$ENABLE_NGINX_UPDATE" != "true" ]]; then
         warn "NGINX update desabilitado (ENABLE_NGINX_UPDATE=$ENABLE_NGINX_UPDATE)"
         return 0
     fi
 
-    # Verifica se arquivo nginx existe
-    if [[ ! -f "$NGINX_CONFIG_PATH" ]]; then
-        warn "Arquivo nginx nao encontrado: $NGINX_CONFIG_PATH"
-        warn "Pulando atualizacao do nginx - configure NGINX_CONFIG_PATH ou atualize manualmente"
+    if [[ ! -f "$NGINX_UPSTREAM_PATH" ]]; then
+        warn "Arquivo upstream nao encontrado: $NGINX_UPSTREAM_PATH"
+        warn "Pulando atualizacao do nginx - configure NGINX_UPSTREAM_PATH ou atualize manualmente"
         return 0
     fi
 
     info "Atualizando nginx upstream para profile: $target_profile"
     info "   API primario: :${api_port} (backup: :${backup_port})"
 
-    # Cria backup da configuração atual
-    local backup_file="${NGINX_CONFIG_PATH}.bak.$(date +%Y%m%d_%H%M%S)"
-    cp "$NGINX_CONFIG_PATH" "$backup_file"
+    local backup_file="${NGINX_UPSTREAM_PATH}.bak.$(date +%Y%m%d_%H%M%S)"
+    cp "$NGINX_UPSTREAM_PATH" "$backup_file"
     log "   Backup criado: $backup_file"
 
-    # Cria arquivo temporário para a nova configuração
-    local temp_config
-    temp_config=$(mktemp)
+    local state_label
+    [[ "$target_profile" == "blue" ]] && state_label="BLUE" || state_label="GREEN"
 
-    # Usa sed para atualizar os upstreams
-    # Padrão: substitui as linhas de server dentro dos blocos upstream
-    sed -E "
-        # Upstream farmaeasy_api - atualiza portas
-        /upstream[[:space:]]+farmaeasy_api[[:space:]]*\{/,/\}/ {
-            s/server[[:space:]]+127\.0\.0\.1:800[0-9];/server 127.0.0.1:${api_port};/
-            s/server[[:space:]]+127\.0\.0\.1:800[0-9][[:space:]]+backup;/server 127.0.0.1:${backup_port} backup;/
-        }
-    " "$NGINX_CONFIG_PATH" > "$temp_config"
+    cat > "$NGINX_UPSTREAM_PATH" << EOF
+# =============================================================================
+# FarmaEasy API Upstream - Blue/Green Deployment
+# =============================================================================
+# ARQUIVO GERENCIADO PELO SCRIPT blue-green-deploy.sh
+# NAO EDITE MANUALMENTE - Use: ./blue-green-deploy.sh update-nginx [blue|green]
+#
+# Portas:
+#   - Blue  = ${BLUE_PORT}
+#   - Green = ${GREEN_PORT}
+#
+# Estado atual: ${state_label} ativo
+# =============================================================================
 
-    # Verifica se a substituição foi feita
-    if ! grep -q "server 127.0.0.1:${api_port};" "$temp_config"; then
-        warn "   Substituicao nao detectada - verificando formato do nginx"
-    fi
+upstream farmaeasy_api {
+    server 127.0.0.1:${api_port};          # ${state_label} - primary (ATIVO)
+    server 127.0.0.1:${backup_port} backup;   # $([ "$state_label" == "BLUE" ] && echo "GREEN" || echo "BLUE") - backup
+    keepalive 32;
+}
+EOF
 
-    # Substitui o arquivo original
-    mv "$temp_config" "$NGINX_CONFIG_PATH"
-
-    # Testa configuração do nginx
     log "   Testando configuracao nginx..."
     if ! nginx -t 2>&1; then
         err "Configuracao nginx invalida! Restaurando backup..."
-        cp "$backup_file" "$NGINX_CONFIG_PATH"
+        cp "$backup_file" "$NGINX_UPSTREAM_PATH"
         return 1
     fi
 
-    # Reload do nginx
     log "   Recarregando nginx..."
     if ! nginx -s reload 2>&1; then
         err "Falha ao recarregar nginx! Restaurando backup..."
-        cp "$backup_file" "$NGINX_CONFIG_PATH"
+        cp "$backup_file" "$NGINX_UPSTREAM_PATH"
         nginx -s reload || true
         return 1
     fi
@@ -207,24 +206,22 @@ update_nginx_upstream() {
     log "Nginx atualizado com sucesso!"
     log "   Requests agora vao para: ${target_profile} (API:${api_port})"
 
-    # Remove backups antigos (mantém últimos 5)
-    find "$(dirname "$NGINX_CONFIG_PATH")" -name "$(basename "$NGINX_CONFIG_PATH").bak.*" -type f | \
+    find "$(dirname "$NGINX_UPSTREAM_PATH")" -name "$(basename "$NGINX_UPSTREAM_PATH").bak.*" -type f | \
         sort -r | tail -n +6 | xargs -r rm -f
 
     return 0
 }
 
-# Função para verificar status atual do nginx
 nginx_status() {
     info "NGINX Upstream Status"
-    if [[ ! -f "$NGINX_CONFIG_PATH" ]]; then
-        warn "   Arquivo nao encontrado: $NGINX_CONFIG_PATH"
+    if [[ ! -f "$NGINX_UPSTREAM_PATH" ]]; then
+        warn "   Arquivo upstream nao encontrado: $NGINX_UPSTREAM_PATH"
         return 1
     fi
 
-    echo "   Config: $NGINX_CONFIG_PATH"
+    echo "   Config: $NGINX_UPSTREAM_PATH"
     echo "   farmaeasy_api upstream:"
-    grep -A 3 "upstream farmaeasy_api" "$NGINX_CONFIG_PATH" 2>/dev/null | grep "server" | sed 's/^/      /'
+    grep -A 3 "upstream farmaeasy_api" "$NGINX_UPSTREAM_PATH" 2>/dev/null | grep "server" | sed 's/^/      /'
 }
 
 deploy() {
