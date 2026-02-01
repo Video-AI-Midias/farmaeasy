@@ -8,6 +8,7 @@ Business logic for:
 - Listing and revoking links
 """
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -1007,10 +1008,8 @@ class RegistrationLinkService:
             if row is not None:
                 # Method 1: Try accessing as first element (index 0)
                 # LWT results have [applied] as the first column
-                try:
+                with contextlib.suppress(IndexError, TypeError):
                     was_applied = bool(row[0])
-                except (IndexError, TypeError):
-                    pass
 
                 # Method 2: Try as 'applied' attribute (some drivers normalize the name)
                 if not was_applied:
