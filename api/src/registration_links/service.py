@@ -878,7 +878,40 @@ class RegistrationLinkService:
                         course_id=str(course_id),
                         course_title=course_title,
                     )
-                except (ValueError, RuntimeError, KeyError) as e:
+                except ValueError as e:
+                    # Check if this is "already has access" - treat as success
+                    error_msg = str(e).lower()
+                    if (
+                        "already has access" in error_msg
+                        or "already has active access" in error_msg
+                    ):
+                        # User already has access - this is fine, not an error
+                        logger.info(
+                            "course_access_already_exists",
+                            user_id=str(user_id),
+                            course_id=str(course_id),
+                            note="User already has access, treating as success",
+                        )
+                        # Get course title and add to granted list
+                        course_title = await self._get_course_title(course_id)
+                        granted_courses.append(
+                            CoursePreview(
+                                id=course_id,
+                                title=course_title,
+                            )
+                        )
+                    else:
+                        # Other ValueError - actual failure
+                        failed_course_ids.append(course_id)
+                        errors.append(str(e))
+                        logger.error(
+                            "course_grant_failed",
+                            user_id=str(user_id),
+                            course_id=str(course_id),
+                            error=str(e),
+                            error_type=type(e).__name__,
+                        )
+                except (RuntimeError, KeyError) as e:
                     # Specific expected exceptions from acquisition service
                     failed_course_ids.append(course_id)
                     errors.append(str(e))
@@ -964,8 +997,33 @@ class RegistrationLinkService:
             )
 
             # LWT returns [applied] column - True if update was applied
+            # The cassandra-driver returns this as the first element of the row
+            # or as an attribute named 'applied' (without brackets)
             row = result[0] if result else None
-            was_applied = row and getattr(row, "[applied]", False)
+
+            # Try multiple ways to access the [applied] field
+            # The field name varies by driver version and row factory
+            was_applied = False
+            if row is not None:
+                # Method 1: Try accessing as first element (index 0)
+                # LWT results have [applied] as the first column
+                try:
+                    was_applied = bool(row[0])
+                except (IndexError, TypeError):
+                    pass
+
+                # Method 2: Try as 'applied' attribute (some drivers normalize the name)
+                if not was_applied:
+                    was_applied = bool(getattr(row, "applied", False))
+
+            # Log the raw result for debugging
+            logger.debug(
+                "lwt_result_debug",
+                link_id=str(link_id),
+                row_type=type(row).__name__ if row else "None",
+                row_repr=repr(row)[:200] if row else "None",
+                was_applied=was_applied,
+            )
 
             if was_applied:
                 # Update lookup table (best effort - main table is source of truth)
@@ -973,6 +1031,11 @@ class RegistrationLinkService:
                     await self.session.aexecute(
                         self._update_lookup_status,
                         [LinkStatus.USED.value, shortcode],
+                    )
+                    logger.debug(
+                        "lookup_table_updated",
+                        link_id=str(link_id),
+                        shortcode=shortcode,
                     )
                 except Exception as e:
                     # Log but don't fail - main table update succeeded
@@ -992,10 +1055,18 @@ class RegistrationLinkService:
 
             # Link was not in PENDING status - someone else got it first
             # Determine the actual current status for better debugging
+            current_status = "unknown"
             if row is None:
                 current_status = "database_returned_empty"
             else:
-                current_status = getattr(row, "status", "status_field_missing")
+                # Try to get the current status from the LWT response
+                # When LWT fails, Cassandra returns the current values
+                try:
+                    # Try index 1 (status is second column after [applied])
+                    current_status = str(row[1]) if len(row) > 1 else "no_status_in_row"
+                except (IndexError, TypeError):
+                    # Try as attribute
+                    current_status = getattr(row, "status", "status_field_missing")
 
             logger.warning(
                 "link_reservation_failed_not_pending",
@@ -1003,6 +1074,7 @@ class RegistrationLinkService:
                 shortcode=shortcode,
                 current_status=current_status,
                 row_returned=row is not None,
+                row_length=len(row) if row and hasattr(row, "__len__") else 0,
             )
             return False
 
