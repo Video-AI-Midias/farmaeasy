@@ -261,6 +261,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             auth_service=app_state.auth_service,
             acquisition_service=acquisition_service,
             course_service=app_state.course_service,
+            progress_service=app_state.progress_service,
         )
         app.state.registration_link_service = app_state.registration_link_service
         logger.info("registration_link_service_initialized")

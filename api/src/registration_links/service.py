@@ -165,6 +165,7 @@ class RegistrationLinkService:
         auth_service=None,
         acquisition_service=None,
         course_service=None,
+        progress_service=None,
     ):
         """Initialize with Cassandra session and optional dependencies.
 
@@ -175,6 +176,7 @@ class RegistrationLinkService:
             auth_service: AuthService for user creation
             acquisition_service: AcquisitionService for granting course access
             course_service: CourseService for course validation and info retrieval
+            progress_service: ProgressService for creating enrollments
         """
         self.session = session
         self.keyspace = keyspace
@@ -182,6 +184,7 @@ class RegistrationLinkService:
         self.auth_service = auth_service
         self.acquisition_service = acquisition_service
         self.course_service = course_service
+        self.progress_service = progress_service
         self._prepare_statements()
 
     def _prepare_statements(self) -> None:
@@ -833,6 +836,43 @@ class RegistrationLinkService:
             )
             return "Curso"
 
+    async def _ensure_enrollment(self, user_id: UUID, course_id: UUID) -> None:
+        """Ensure user has enrollment for course (creates if not exists).
+
+        Enrollment is required for the course to appear in 'Meus Cursos'.
+        This is idempotent - if enrollment already exists, it's a no-op.
+        """
+        if not self.progress_service:
+            logger.warning(
+                "enrollment_skipped_no_service",
+                user_id=str(user_id),
+                course_id=str(course_id),
+            )
+            return
+
+        try:
+            await self.progress_service.enroll_user(user_id, course_id)
+            logger.info(
+                "enrollment_created",
+                user_id=str(user_id),
+                course_id=str(course_id),
+            )
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "already" in error_msg or "enrolled" in error_msg:
+                logger.debug(
+                    "enrollment_already_exists",
+                    user_id=str(user_id),
+                    course_id=str(course_id),
+                )
+            else:
+                logger.warning(
+                    "enrollment_creation_failed",
+                    user_id=str(user_id),
+                    course_id=str(course_id),
+                    error=str(e),
+                )
+
     async def _grant_course_access(
         self,
         user_id: UUID,
@@ -879,6 +919,8 @@ class RegistrationLinkService:
                         course_id=str(course_id),
                         course_title=course_title,
                     )
+
+                    await self._ensure_enrollment(user_id, course_id)
                 except ValueError as e:
                     # Check if this is "already has access" - treat as success
                     error_msg = str(e).lower()
@@ -901,6 +943,7 @@ class RegistrationLinkService:
                                 title=course_title,
                             )
                         )
+                        await self._ensure_enrollment(user_id, course_id)
                     else:
                         # Other ValueError - actual failure
                         failed_course_ids.append(course_id)
