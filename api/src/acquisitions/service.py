@@ -65,11 +65,20 @@ class AcquisitionService:
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """)
 
-        # Get user's acquisition for a course
+        # Get user's acquisition for a course (DEPRECATED - use _get_user_course_acquisitions)
+        # WARNING: LIMIT 1 with random UUID clustering can return wrong row
+        # Keeping for backward compatibility but should not be used
         self._get_user_course_acquisition = self.session.prepare(f"""
             SELECT * FROM {self.keyspace}.course_acquisitions
             WHERE user_id = ? AND course_id = ?
             LIMIT 1
+        """)
+
+        # Get ALL user's acquisitions for a specific course (no LIMIT - returns all)
+        # Use this instead of _get_user_course_acquisition to avoid non-deterministic results
+        self._get_user_course_acquisitions = self.session.prepare(f"""
+            SELECT * FROM {self.keyspace}.course_acquisitions
+            WHERE user_id = ? AND course_id = ?
         """)
 
         # Get all user's acquisitions
@@ -150,26 +159,25 @@ class AcquisitionService:
         ):
             return True
 
-        # Check Redis cache first (only for acquisition-based access)
+        cache_key = f"access:{user_id}:{course_id}"
+
         if self.redis:
-            cache_key = f"access:{user_id}:{course_id}"
             cached = await self.redis.get(cache_key)
             if cached is not None:
                 return cached == b"1"
 
-        # Query database
-        result = await self.session.aexecute(
-            self._get_user_course_acquisition,
+        rows = await self.session.aexecute(
+            self._get_user_course_acquisitions,
             [user_id, course_id],
         )
-        row = result[0] if result else None
 
         has_access = False
-        if row:
+        for row in rows:
             acquisition = CourseAcquisition.from_row(row)
-            has_access = acquisition.is_active()
+            if acquisition.is_active():
+                has_access = True
+                break
 
-        # Cache result (5 minutes)
         if self.redis:
             await self.redis.setex(cache_key, 300, "1" if has_access else "0")
 
@@ -220,26 +228,33 @@ class AcquisitionService:
                 can_enroll=False,
             )
 
-        # 3. Check actual acquisition (students)
-        result = await self.session.aexecute(
-            self._get_user_course_acquisition,
+        rows = await self.session.aexecute(
+            self._get_user_course_acquisitions,
             [user_id, course_id],
         )
-        row = result[0] if result else None
 
-        if not row:
+        if not rows:
             return CheckAccessResponse(has_access=False, can_enroll=True)
 
-        acquisition = CourseAcquisition.from_row(row)
-        is_active = acquisition.is_active()
+        active_acquisition: CourseAcquisition | None = None
+        for row in rows:
+            acq = CourseAcquisition.from_row(row)
+            if acq.is_active() and (
+                active_acquisition is None
+                or acq.granted_at > active_acquisition.granted_at
+            ):
+                active_acquisition = acq
+
+        if not active_acquisition:
+            return CheckAccessResponse(has_access=False, can_enroll=True)
 
         return CheckAccessResponse(
-            has_access=is_active,
-            access_reason=AccessReason.ACQUISITION if is_active else None,
-            acquisition_type=acquisition.acquisition_type if is_active else None,
-            expires_at=acquisition.expires_at if is_active else None,
-            acquisition_id=acquisition.acquisition_id if is_active else None,
-            can_enroll=not is_active,
+            has_access=True,
+            access_reason=AccessReason.ACQUISITION,
+            acquisition_type=active_acquisition.acquisition_type,
+            expires_at=active_acquisition.expires_at,
+            acquisition_id=active_acquisition.acquisition_id,
+            can_enroll=False,
             is_preview_mode=False,
         )
 
